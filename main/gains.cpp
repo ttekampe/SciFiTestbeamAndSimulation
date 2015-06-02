@@ -38,7 +38,11 @@ struct config{
   bool debug;
 };
 
-void GetGain(TTree* t, const unsigned int uplinkMin, const unsigned int uplinkMax, const unsigned int adcIDmin, const unsigned int adcIDmax, std::string saveName = {""}, const unsigned int maxGaussians = {4}){
+
+void GetGain(TTree* t, const unsigned int uplinkMin, const unsigned int uplinkMax, const unsigned int adcIDmin, const unsigned int adcIDmax, const unsigned int maxGaussians, TString fileName){
+  TString saveName = fileName;
+  saveName.Remove(0, saveName.Last('/')+1);
+  saveName.ReplaceAll(".root", "_gain.txt");
   std::ofstream gainFile(saveName);
   gainFile << "uplinkNumber\tadcNumber\tgain\tgainErr" << std::endl;
 
@@ -216,7 +220,8 @@ int main(int argc, char *argv[]){
   unsigned int adcIDmax;
   searchBranches(inputTree, uplinkMin, uplinkMax, adcIDmin, adcIDmax);
 
-  GetGain(inputTree, uplinks, adcIDs, "gainsFile");
+
+  GetGain(inputTree, uplinks, adcIDs, c.nGaussians, c.inputFile);
 
   return 0;
 }
