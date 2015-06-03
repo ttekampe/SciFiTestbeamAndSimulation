@@ -1,3 +1,6 @@
+#ifndef CLUSTERALGORITHMS_H
+#define CLUSTERALGORITHMS_H
+
 //from here
 #include "Cluster.h"
 
@@ -5,8 +8,6 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-
-
 
 
 
@@ -26,3 +27,6 @@ void FindClustersInEventFTStyle(std::vector<Cluster*>& clusterVector,
                                 const double sumThreshold,
                                 const unsigned int maxClusterSize = {4},
                                 bool debug = {false});
+
+
+#endif // CLUSTERALGORITHMS_H

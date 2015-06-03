@@ -39,136 +39,6 @@ struct config{
 };
 
 
-void GetGain(TTree* t, const unsigned int uplinkMin, const unsigned int uplinkMax, const unsigned int adcIDmin, const unsigned int adcIDmax, const unsigned int maxGaussians, TString fileName){
-  TString saveName = fileName;
-  saveName.Remove(0, saveName.Last('/')+1);
-  saveName.ReplaceAll(".root", "_gain.txt");
-  std::ofstream gainFile(saveName);
-  gainFile << "uplinkNumber\tadcNumber\tgain\tgainErr" << std::endl;
-
-  TString canvasName = saveName;
-  canvasName.ReplaceAll(".root", ".pdf");
-
-  TCanvas can("", "");
-  can.SaveAs( (canvasName + "[").Data() );
-
-  double numFits{0.};
-  double failedFits{0.};
-
-  TString branchNameTemplate = "Uplink_";
-  for(unsigned int uplinkNumber = uplinkMin; uplinkNumber<=uplinkMax; ++uplinkNumber){
-    TString branchNameTemplate2 = branchNameTemplate + std::to_string(uplinkNumber) + "_";
-
-    for(unsigned int adcNumber = adcIDmin; adcNumber<=adcIDmax; ++adcNumber){
-      unsigned int nGaussians = maxGaussians;
-      TString branchName = branchNameTemplate2 + std::to_string(adcNumber);
-      t->SetBranchStatus("*", 0);
-      t->SetBranchStatus(branchName, 1);
-      TSpectrum spec(nGaussians);
-      TH1D hist("hist", "hist", 120, 400., 1000.);
-      t->Draw(branchName + ">>hist");
-      spec.Search(&hist);
-      nGaussians = spec.GetNPeaks();
-      Float_t* peaks = spec.GetPositionX();
-
-      Float_t max_peak = *std::max_element(peaks, peaks+nGaussians);
-      Float_t min_peak = *std::min_element(peaks, peaks+nGaussians);
-
-//      std::cout << "Found peaks at ";
-//      for(unsigned int k = 0; k<nGaussians; ++k){
-//        std::cout << peaks [k] << "\t";
-//      }
-//      std::cout << std::endl;
-
-      RooRealVar adcCount(branchName, "adcCount", min_peak-30., max_peak+30.);
-      RooRealVar mean("mean", "", min_peak, 420., 650.);
-      RooRealVar sigma("sigma", "", 10., 0., 20.);
-      RooRealVar gain("gain", "", (max_peak-min_peak)/(nGaussians-1.), 45., 75.);
-      RooDataSet dataSet("dataSet", "", t, RooArgSet(adcCount));
-
-      std::vector<RooGaussian*> gaussians(nGaussians, nullptr);
-      std::vector<RooFormulaVar*> means(nGaussians, nullptr);
-      std::vector<RooRealVar*> fractions(nGaussians-1, nullptr);
-
-      RooArgList gaussianList("gaussianList");
-      RooArgList fractionList("fractionList");
-      for(unsigned int j=0; j<nGaussians; ++j){
-        means[j] = new RooFormulaVar( TString("mean_" + std::to_string(j) ).Data(), "", TString("mean+gain*" + std::to_string(j) ).Data(), RooArgList(mean, gain));
-        gaussians[j] = new RooGaussian( TString("gaussian_" + std::to_string(j) ).Data(), "", adcCount, *means[j], sigma);
-        gaussianList.add(*gaussians[j]);
-        if(j>0){
-          fractions[j-1] = new RooRealVar( TString("fraction_" + std::to_string(j) ).Data(), "", 1./2./j, 0., 1.);
-          fractionList.add(*fractions[j-1]);
-        }
-      }
-      RooAddPdf pdf("pdf", "", gaussianList, fractionList);
-
-      //RooFitResult* fs = pdf.fitTo(dataSet, RooFit::Save(true));
-      //fs->Print("v");
-      ++numFits;
-      RooAbsReal* nll = pdf.createNLL(dataSet);
-
-      RooMinuit minu(*nll);
-      minu.setStrategy(2); // ensure minimum true, errors correct
-
-      // call MIGRAD -- minimises the likelihood
-      int migradStatusCode = minu.migrad(); // catch status code
-
-      // could also get an intermediary RooFitResult if you want
-    //      RooFitResult *migradFitResult = m.save();
-    //      int migradStatusCode2 = migradFitResult->status();
-
-      // call HESSE -- calculates error matrix
-      int hesseStatusCode = minu.hesse();
-
-      RooFitResult *fs = minu.save();  // equivalent result to that from fitTo call
-
-
-      // check for success
-      int covarianceQuality = fs->covQual();
-
-  //    int minosStatusCode = minu.minos();
-
-
-      bool isAGoodFit = ((hesseStatusCode==0) && (migradStatusCode==0) && (covarianceQuality==3));// && (minosStatusCode==0) );
-      fs->Print("v");
-
-      if(!isAGoodFit){
-        ++failedFits;
-        std::cout << "Fit for uplink " << uplinkNumber << " and adc " << adcNumber << " failed!" << std::endl;
-      }
-
-      gainFile << uplinkNumber << "\t" << adcNumber << "\t" << gain.getVal() << "\t" << gain.getError() << std::endl;
-
-      RooPlot* myFrame = adcCount.frame();
-      dataSet.plotOn(myFrame);
-      pdf.plotOn(myFrame);
-      myFrame->Draw();
-      can.SaveAs( (canvasName).Data() );
-
-      for(unsigned int i=0; i<nGaussians; ++i){
-        delete means[i];
-        delete gaussians[i];
-        if(i>0){
-          delete fractions[i-1];
-        }
-      }
-    }
-  }
-  can.SaveAs( (canvasName + "]").Data() );
-
-  std::cout << failedFits/numFits*100. << "% of all fits failed." << std::endl;
-}
-
-void searchBranches(TTree* inputTree, unsigned int& uplinkMin, unsigned int& uplinkMax, unsigned int& adcIDmin, unsigned int& adcIDmax){
-  TString branchNameTemplate = "Uplink_";
-  for(unsigned int uplinkNumber = uplinkMin; uplinkNumber<=uplinkMax; ++uplinkNumber){
-    TString branchNameTemplate2 = branchNameTemplate + std::to_string(uplinkNumber) + "_";
-
-    for(unsigned int adcNumber = adcIDmin; adcNumber<=adcIDmax; ++adcNumber){
-      unsigned int nGaussians = maxGaussians;
-      TString branchName = branchNameTemplate2 + std::to_string(adcNumber);
-}
 
 int parseOptions(config &c, int argc, char *argv[]){
 
@@ -212,16 +82,9 @@ int main(int argc, char *argv[]){
   TFile inputFile(c.inputFile.c_str(), "READ");
   TTree* inputTree = dynamic_cast<TTree*>(inputFile.Get("rawData"));
 
-  std::vector<unsigned int> uplinks;
-  std::vector<unsigned int> adcIDs;
-  unsigned int uplinkMin;
-  unsigned int uplinkMax;
-  unsigned int adcIDmin;
-  unsigned int adcIDmax;
-  searchBranches(inputTree, uplinkMin, uplinkMax, adcIDmin, adcIDmax);
 
 
-  GetGain(inputTree, uplinks, adcIDs, c.nGaussians, c.inputFile);
+//  GetGain(inputTree, 3, 4, 1, 128, c.nGaussians, c.inputFile);
 
   return 0;
 }

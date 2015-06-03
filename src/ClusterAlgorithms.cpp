@@ -6,8 +6,6 @@
 #include <vector>
 
 
-
-
 void FindClustersInEvent(std::vector<Cluster*>& clusterVector,
                          const std::vector<Channel>& event,
                          const double neighbourThreshold,

@@ -17,4 +17,4 @@ namespace lhcb
 
 
 
-#endif /* LHCBSTYKLE */
+#endif /* LHCBSTYLE */
