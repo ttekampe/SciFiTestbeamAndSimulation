@@ -30,6 +30,22 @@
 #include "Calibration.h"
 
 
+
+
+
+
+
+
+
+
+TString removePath(TString str){
+  Ssiz_t posOfSlash = str.Last('/');
+  if(posOfSlash != kNPOS){
+    str = str.Replace(0, posOfSlash+1, "");
+  }
+  return str;
+}
+
 std::vector<std::vector<Channel>*>* parseRootTree(TTree* dataTree,
                                                   unsigned int uplinkMin,
                                                   unsigned int uplinkMax,
@@ -68,16 +84,21 @@ std::vector<std::vector<Channel>*>* parseRootTree(TTree* dataTree,
       }
       dataVector->at(i) = event;
     }
-  for(unsigned int i = 0; i< nAdcs; ++i){
+
+  dataTree->ResetBranchAddresses();
+  for(unsigned int i = 0; i< nUplinks; ++i){
     delete[] adcVals[i];
   }
   delete[] adcVals;
+
   return dataVector;
 }
 
 
 
 void produceGains(TTree* t, const unsigned int uplinkMin, const unsigned int uplinkMax, const unsigned int adcIDmin, const unsigned int adcIDmax, const unsigned int maxGaussians, TString fileName, std::string savePath){
+  RooMsgService::instance().setGlobalKillBelow(RooFit::ERROR);
+  RooMsgService::instance().setSilentMode(true);
   lhcb::lhcbStyle();
   TString saveName = fileName;
   saveName.Remove(0, saveName.Last('/')+1);
@@ -267,6 +288,9 @@ calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber){
   }
 
 unsigned int runNumberFromFilename(std::string filename){
+  if(size_t posOfSlash = filename.rfind("/") != std::string::npos){
+    filename = filename.substr(posOfSlash+1);
+  }
   return std::stoi(filename.substr( filename.find("_")+1, filename.find("_", filename.find("_")+1)-filename.find("_")-1 ));
 }
 
@@ -279,30 +303,100 @@ std::map<unsigned int, std::map<unsigned int, double> > getPedestals(const std::
   if(pedestalTree == nullptr){
     std::cerr << "pedestal tree is nullptr" << std::endl;
   }
-
-  float* adcVals = new float[nAdcs];
-  std::string branchName = "Uplink_";
-  std::map<unsigned int, std::map<unsigned int, double> > pedestals;
-
+  const unsigned int nUplinks = uplinkMax-uplinkMin+1;
+  std::cout << "creating double array of form double[" << nUplinks << "][" << nAdcs << "]\n";
+  float** rawAdcVals = new float*[nUplinks];
+  for(unsigned int i = 0; i< nUplinks; ++i){
+    rawAdcVals[i] = new float[nAdcs];
+  }
+  std::cout << "setting branch addresses" << std::endl;
+  std::string branchNameTemplate1 = "Uplink_";
   for(unsigned int uplink = uplinkMin; uplink<=uplinkMax; ++uplink){
-    branchName += std::to_string(uplink) + "_adc_";
-
-    for(unsigned int i = 0; i<nAdcs; ++i){
-      pedestalTree->SetBranchStatus("*", 0);
-      pedestalTree->SetBranchStatus((branchName + std::to_string(i+1)).c_str(), 1);
-      pedestalTree->SetBranchAddress((branchName + std::to_string(i+1)).c_str(), &adcVals[i]);
+    std::string branchNameTemplate2 = branchNameTemplate1 + std::to_string(uplink) + "_adc_";
+    for(unsigned int adc = 1; adc<=nAdcs; ++adc){
+      std::string branchName = branchNameTemplate2 + std::to_string(adc);
+      std::cout << "setting adress for branch " << branchName << " to double[" << uplink - uplinkMin << "][" << adc-1 << "]"  <<  std::endl;
+      pedestalTree->SetBranchAddress(branchName.c_str(), &rawAdcVals[uplink - uplinkMin][adc-1]);
     }
-    for(unsigned int i = 0; i < pedestalTree->GetEntriesFast(); ++i){
-      pedestalTree->GetEntry(i);
-      for(unsigned int adcNum = 0; adcNum < nAdcs; ++adcNum){
-        pedestals[uplink][adcNum] += adcVals[adcNum];
+  }
+  std::cout << "loop over file" << std::endl;
+  std::map<unsigned int, std::map<unsigned int, double> > pedestals;
+  for(unsigned int i =0; i<pedestalTree->GetEntriesFast(); ++i){
+    pedestalTree->GetEntry(i);
+    for(unsigned int uplink = uplinkMin; uplink<=uplinkMax; ++uplink){
+      for(unsigned int adc = 1; adc <= nAdcs; ++adc){
+        pedestals[uplink][adc] += rawAdcVals[uplink - uplinkMin][adc-1];
       }
     }
-    for(unsigned int adcNum = 0; adcNum < nAdcs; ++adcNum){
+  }
+
+  for(unsigned int uplink = uplinkMin; uplink<=uplinkMax; ++uplink){
+    for(unsigned int adcNum = 1; adcNum <= nAdcs; ++adcNum){
       pedestals[uplink][adcNum] /= pedestalTree->GetEntriesFast();
     }
   }
+  pedestalTree->ResetBranchAddresses();
   pedestalFile.Close();
-  delete[] adcVals;
+  for(unsigned int i = 0; i< nUplinks; ++i){
+    delete[] rawAdcVals[i];
+  }
+  delete[] rawAdcVals;
+
   return pedestals;
+}
+
+
+void correctFile(TTree* tree2correct,
+                 const std::map<unsigned int, std::map<unsigned int, double> > &gains,
+                 const std::map<unsigned int, std::map<unsigned int, double> > &pedestals,
+                 const unsigned int uplinkMin,
+                 const unsigned int uplinkMax,
+                 const unsigned int nAdcs,
+                 TString newFileName){
+
+  newFileName = removePath(newFileName);
+  TFile correctedFile(("/data/testbeam/corrected/" + newFileName).Data(), "RECREATE");
+  TTree* correctedTree = new TTree("rawData", "rawData");
+
+  //setup fill mechanism for new TTree
+  const unsigned int nUplinks = uplinkMax-uplinkMin+1;
+  float** correctedAdcVals = new float*[nUplinks];
+  for(unsigned int i = 0; i< nUplinks; ++i){
+    correctedAdcVals[i] = new float[nAdcs];
+  }
+  float** rawAdcVals = new float*[nUplinks];
+  for(unsigned int i = 0; i< nUplinks; ++i){
+    rawAdcVals[i] = new float[nAdcs];
+  }
+
+  std::string branchNameTemplate1 = "Uplink_";
+  for(unsigned int uplink = uplinkMin; uplink<=uplinkMax; ++uplink){
+    std::string branchNameTemplate2 = branchNameTemplate1 + std::to_string(uplink) + "_adc_";
+    for(unsigned int adc = 0; adc<nAdcs; ++adc){
+      std::string branchName = branchNameTemplate2 + std::to_string(adc+1);
+      tree2correct->SetBranchAddress(branchName.c_str(), &rawAdcVals[uplink - uplinkMin][adc]);
+      correctedTree->Branch(branchName.c_str(), &correctedAdcVals[uplink - uplinkMin][adc], (branchName + "/F").c_str() );
+    }
+  }
+  for(unsigned int i=0; i<tree2correct->GetEntriesFast(); ++i){
+    tree2correct->GetEntry(i);
+    for(unsigned int uplink = uplinkMin; uplink<=uplinkMax; ++uplink){
+      for(unsigned int adc = 1; adc<=nAdcs; ++adc){
+//      std::cout << uplink << "\t" << adc << "\n";
+      correctedAdcVals[uplink - uplinkMin][adc-1] = ( rawAdcVals[uplink - uplinkMin][adc-1] - pedestals.at(uplink).at(adc) ) / gains.at(uplink).at(adc);
+//      std::cout << correctedAdcVals[uplink - uplinkMin][adc-1] << std::endl;
+      }
+    }
+    correctedTree->Fill();
+  }
+  correctedTree->ResetBranchAddresses();
+  correctedTree->Write();
+  correctedFile.Close();
+
+  for(unsigned int i = 0; i< nUplinks; ++i){
+    delete[] correctedAdcVals[i];
+    delete[] rawAdcVals[i];
+  }
+  delete[] correctedAdcVals;
+  delete[] rawAdcVals;
 }

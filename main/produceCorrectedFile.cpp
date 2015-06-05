@@ -65,9 +65,10 @@ int main(int argc, char *argv[]){
 
   std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark << "\tled: " << calNum.led << std::endl;
 
-  c.darkFileName = "btsoftware_" + std::to_string(calNum.dark) + "_calib_dark_ntuple.root";
-  c.ledFileName = "btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
 
+
+  c.darkFileName = "/data/testbeam/btsoftware_" + std::to_string(calNum.dark) + "_calib_dark_ntuple.root";
+  c.ledFileName = "/data/testbeam/btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
 
   TFile darkFile(c.darkFileName.c_str(), "READ");
   TFile dataFile(c.file2correct.c_str(), "READ");
@@ -82,14 +83,41 @@ int main(int argc, char *argv[]){
     return 0;
   }
 
+
   TString gainFileName = c.ledFileName;
+  gainFileName = removePath(gainFileName);
   gainFileName.ReplaceAll(".root", "_gain.txt");
-  std::ifstream gainFile("/home/tobi/SciFi/results/gains/" + gainFileName);
+  gainFileName = "/home/tobi/SciFi/results/gains/" + gainFileName;
+
+
+  std::cout << " looking for file " << gainFileName << std::endl;
+  std::ifstream gainFile(gainFileName);
   if(!gainFile){
+    std::cout << "could not find gainfile -> producing gains" << std::endl;
     produceGains(ledTree, 3, 4, 1, 128, 4, c.ledFileName, "/home/tobi/SciFi/results/gains/");
-    gainFile.open("/home/tobi/SciFi/results/gains/" + gainFileName);
+  }
+  else std::cout << "found gain file." << std::endl;
+  gainFile.close();
+
+  std::cout << "readinf gains" << std::endl;
+  std::map<unsigned int, std::map<unsigned int, double>> gains = readGains(gainFileName.Data());
+
+
+  std::cout << "reading pedestals" << std::endl;
+  std::map<unsigned int, std::map<unsigned int, double> > pedestals = getPedestals(c.darkFileName, 3, 4, 128);
+
+  for(unsigned int i=3; i<=4; ++i){
+    for(unsigned int j = 1; j<=128; ++j){
+      std::cout << "uplink: " i << "\tadc: " << j << "\t pesdestal: " << pedestals[i][j]<< "\t gain: " << gains[i][j] << std::endl;
+    }
   }
 
+
+  TString newFileName = "/data/testbeam/corrected" + c.file2correct;
+  newFileName.ReplaceAll(".root", "_corrected.root");
+
+  std::cout << "correcting file" << std::endl;
+  correctFile(dataTree, gains, pedestals, 3, 4, 128, newFileName);
 
   return 0;
 }

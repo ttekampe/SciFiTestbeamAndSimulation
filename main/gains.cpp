@@ -92,7 +92,7 @@ int main(int argc, char *argv[]){
   TFile inputFile( ("/data/testbeam/" + ledFileName).c_str(), "READ");
   TTree* inputTree = dynamic_cast<TTree*>(inputFile.Get("rawData"));
 
-  produceGains(inputTree, 3,4,1,128,4, ledFileName, "/home/tobi/SciFi/results/gains/");
+  produceGains(inputTree, 3, 4, 1, 128, c.nGaussians, ledFileName, "/home/tobi/SciFi/results/gains/");
 
   TString saveName = ledFileName;
   saveName.Remove(0, saveName.Last('/')+1);

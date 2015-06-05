@@ -53,4 +53,14 @@ std::map<unsigned int, std::map<unsigned int, double> > getPedestals(const std::
                                                                      const unsigned int uplinkMax,
                                                                      const unsigned int nAdcs);
 
+void correctFile(TTree* tree2correct,
+                 const std::map<unsigned int, std::map<unsigned int, double>>& gains,
+                 const std::map<unsigned int, std::map<unsigned int, double> >& pedestals,
+                 const unsigned int uplinkMin,
+                 const unsigned int uplinkMax,
+                 const unsigned int nAdcs,
+                 TString newFileName);
+
+TString removePath(TString str);
+
 #endif
