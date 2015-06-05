@@ -121,19 +121,22 @@ void produceGains(TTree* t, const unsigned int uplinkMin, const unsigned int upl
 
       RooRealVar adcCount(branchName, branchName, min_peak-30., max_peak+30.);
       RooRealVar mean("mean", "", min_peak, 420., 650.);
-      RooRealVar sigma("sigma", "", 10., 0., 20.);
+      RooRealVar sigma1("sigma1", "", 7., 0., 20.);
+      RooRealVar sigma2("sigma2", "", 4., 0., 20.);
       RooRealVar gain("gain", "", (max_peak-min_peak)/(nGaussians-1.), 45., 75.);
       RooDataSet dataSet("dataSet", "", t, RooArgSet(adcCount));
 
       std::vector<RooGaussian*> gaussians(nGaussians, nullptr);
       std::vector<RooFormulaVar*> means(nGaussians, nullptr);
+      std::vector<RooFormulaVar*> sigmas(nGaussians, nullptr);
       std::vector<RooRealVar*> fractions(nGaussians-1, nullptr);
 
       RooArgList gaussianList("gaussianList");
       RooArgList fractionList("fractionList");
       for(unsigned int j=0; j<nGaussians; ++j){
         means[j] = new RooFormulaVar( TString("mean_" + std::to_string(j) ).Data(), "", TString("mean+gain*" + std::to_string(j) ).Data(), RooArgList(mean, gain));
-        gaussians[j] = new RooGaussian( TString("gaussian_" + std::to_string(j) ).Data(), "", adcCount, *means[j], sigma);
+        sigmas[j] = new RooFormulaVar( TString("sigma_" + std::to_string(j) ).Data(), "", TString("sqrt(sigma1*sigma1+" + std::to_string(j) + "*sigma2*sigma2)").Data(), RooArgList(sigma1, sigma2));
+        gaussians[j] = new RooGaussian( TString("gaussian_" + std::to_string(j) ).Data(), "", adcCount, *means[j], *sigmas[j]);
         gaussianList.add(*gaussians[j]);
         if(j>0){
           fractions[j-1] = new RooRealVar( TString("fraction_" + std::to_string(j) ).Data(), "", 1./2./j, 0., 1.);
@@ -176,9 +179,11 @@ void produceGains(TTree* t, const unsigned int uplinkMin, const unsigned int upl
         ++failedFits;
         std::cout << "Fit for uplink " << uplinkNumber << " and adc " << adcNumber << " failed!" << std::endl;
         fs->Print("v");
+        gainFile << uplinkNumber << "\t" << adcNumber << "\t" << 0 << "\t" << 0 << std::endl;
       }
+      else gainFile << uplinkNumber << "\t" << adcNumber << "\t" << gain.getVal() << "\t" << gain.getError() << std::endl;
 
-      gainFile << uplinkNumber << "\t" << adcNumber << "\t" << gain.getVal() << "\t" << gain.getError() << std::endl;
+//      fs->Print("v");
 
       RooPlot* myFrame = adcCount.frame();
       dataSet.plotOn(myFrame);
@@ -206,15 +211,38 @@ std::map<unsigned int, std::map<unsigned int, double>> readGains(std::string fil
   int uplinkNumber{0};
   int adcNumber{0};
   double gain{0};
+  std::map<unsigned int, double> means;
+  std::map<unsigned int, double> goodGains;
+
 
   std::map<unsigned int, std::map<unsigned int, double>> gains;
   while (std::getline(inputFile, line)) {
-      std::cout << line << std::endl;
       std::istringstream ss(line);
       if(ss >> uplinkNumber >> adcNumber >> gain){
         std::cout << uplinkNumber << "\t" << adcNumber << "\t" << gain << std::endl;
+
+        if(means.find( uplinkNumber ) == means.end()){
+          means[uplinkNumber] = 0.;
+          goodGains[uplinkNumber] = 0.;
+        }
+
         gains[uplinkNumber][adcNumber] = gain;
+
+        if(!gain == 0){
+          means[uplinkNumber] += gain;
+          ++goodGains[uplinkNumber];
+        }
       }
+  }
+  // replace gains from failed fits by the mean of all gains of the same uplink
+  for(auto& uplink : gains){
+    means[uplink.first] /= goodGains[uplink.first];
+    for(auto& adc : uplink.second){
+      if (adc.second == 0){
+        std::cout << "replacing " << adc.second << " by " << means[uplink.first] << std::endl;
+        adc.second = means[uplink.first];
+      }
+    }
   }
   return gains;
 }

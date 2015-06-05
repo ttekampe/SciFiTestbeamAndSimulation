@@ -25,6 +25,7 @@
 
 //from here
 #include "lhcbStyle.h"
+#include "Calibration.h"
 
 //from BOOST
 #include "boost/program_options.hpp"
@@ -79,11 +80,26 @@ int main(int argc, char *argv[]){
     RooMsgService::instance().setGlobalKillBelow(RooFit::ERROR);
     RooMsgService::instance().setSilentMode(true);
   }
-  TFile inputFile(c.inputFile.c_str(), "READ");
+
+
+  const unsigned int runNumber = runNumberFromFilename(c.inputFile);
+  calibrationRunNumbers calNum = lookUpCalibrationFiles(runNumber);
+
+  std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark << "\tled: " << calNum.led << std::endl;
+
+  std::string ledFileName = "btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
+
+  TFile inputFile( ("/data/testbeam/" + ledFileName).c_str(), "READ");
   TTree* inputTree = dynamic_cast<TTree*>(inputFile.Get("rawData"));
 
+  produceGains(inputTree, 3,4,1,128,4, ledFileName, "/home/tobi/SciFi/results/gains/");
 
+  TString saveName = ledFileName;
+  saveName.Remove(0, saveName.Last('/')+1);
+  saveName.ReplaceAll(".root", "_gain.txt");
+  std::string gainFileName("/home/tobi/SciFi/results/gains/" + saveName);
 
+  readGains(gainFileName);
 //  GetGain(inputTree, 3, 4, 1, 128, c.nGaussians, c.inputFile);
 
   return 0;
