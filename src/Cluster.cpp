@@ -37,25 +37,25 @@ void Cluster::Resize(const unsigned int newsize){
   }
 }
 
-double Cluster::GetChargeWeightedMean(){
+double Cluster::GetChargeWeightedMean() const{
   double totalCharge{0.};
   double mean{0.};
   for(const auto& chan : RelatedChannels){
-    mean += chan.ChannelNumber * chan.AdcValue;
+    mean += static_cast<double>(chan.ChannelNumber) * chan.AdcValue;
     totalCharge += chan.AdcValue;
   }
   return mean/totalCharge;
 }
 
-double Cluster::GetHitWeightedMean(){
+double Cluster::GetHitWeightedMean() const{
   double mean{0.};
   for(const auto& chan : RelatedChannels){
     mean += chan.ChannelNumber;
   }
-  return mean/RelatedChannels.size();
+  return mean/static_cast<double>(RelatedChannels.size());
 }
 
-double Cluster::GetSumOfAdcValues(){
+double Cluster::GetSumOfAdcValues() const{
   double sumOfAdcValues{0.};
     for(const auto& chan : RelatedChannels){
     sumOfAdcValues += chan.AdcValue;
@@ -63,7 +63,7 @@ double Cluster::GetSumOfAdcValues(){
   return sumOfAdcValues;
 }
 
-double Cluster::GetMaximumAdcValue(){
+double Cluster::GetMaximumAdcValue() const{
   double maxAdcValue{0.};
   for(const auto& chan : RelatedChannels){
     if(chan.AdcValue > maxAdcValue) maxAdcValue = chan.AdcValue;
@@ -71,18 +71,18 @@ double Cluster::GetMaximumAdcValue(){
   return maxAdcValue;
 }
 
-unsigned int Cluster::GetClusterSize(){
+unsigned int Cluster::GetClusterSize() const{
   return RelatedChannels.size();
 }
 
-unsigned int Cluster::GetMinChannel(){
+unsigned int Cluster::GetMinChannel() const{
   unsigned int minChannel{9999999};
   for(const auto& chan : RelatedChannels){
     if(chan.ChannelNumber < minChannel) minChannel = chan.ChannelNumber;
   }
   return minChannel;
 }
-unsigned int Cluster::GetMaxChannel(){
+unsigned int Cluster::GetMaxChannel() const{
   unsigned int maxChannel{0};
   for(const auto& chan : RelatedChannels){
     if(chan.ChannelNumber > maxChannel) maxChannel = chan.ChannelNumber;

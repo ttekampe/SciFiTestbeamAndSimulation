@@ -66,7 +66,6 @@ int main(int argc, char *argv[]){
   std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark << "\tled: " << calNum.led << std::endl;
 
 
-
   c.darkFileName = "/data/testbeam/btsoftware_" + std::to_string(calNum.dark) + "_calib_dark_ntuple.root";
   c.ledFileName = "/data/testbeam/btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
 
@@ -108,13 +107,18 @@ int main(int argc, char *argv[]){
 
   for(unsigned int i=3; i<=4; ++i){
     for(unsigned int j = 1; j<=128; ++j){
-      std::cout << "uplink: " i << "\tadc: " << j << "\t pesdestal: " << pedestals[i][j]<< "\t gain: " << gains[i][j] << std::endl;
+      std::cout << "uplink: " << i << "\tadc: " << j << "\t pesdestal: " << pedestals[i][j]<< "\t gain: " << gains[i][j] << std::endl;
     }
   }
 
 
   TString newFileName = "/data/testbeam/corrected" + c.file2correct;
   newFileName.ReplaceAll(".root", "_corrected.root");
+
+
+//  TString newFileName = "/data/old_testbeam/corrected" + c.file2correct;
+//  newFileName.ReplaceAll(".root", "_corrected.root");
+
 
   std::cout << "correcting file" << std::endl;
   correctFile(dataTree, gains, pedestals, 3, 4, 128, newFileName);

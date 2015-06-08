@@ -49,9 +49,9 @@ void FindClustersInEvent(std::vector<Cluster*>& clusterVector,
       if(currentCluster->GetClusterSize() >= 2*maxClusterSize && possibleMultipleClusters){// try to split the clusters
         std::cout << "cluster splitting needed!" << std::endl;
         }
-      if(currentCluster->GetClusterSize() > maxClusterSize){//just reduce the cluster
-        currentCluster->Resize(maxClusterSize);
-       }
+//      if(currentCluster->GetClusterSize() > maxClusterSize){//just reduce the cluster
+//        currentCluster->Resize(maxClusterSize);
+//       }
       clusterVector.push_back(currentCluster); //store the cluster
     }
     currentCluster = nullptr; //reset the pointer

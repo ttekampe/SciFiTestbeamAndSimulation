@@ -12,6 +12,7 @@
 //from here
 #include "Cluster.h"
 
+typedef std::vector<Channel> Event;
 
 struct CalibrationFiles{
   std::string pedestal;
@@ -23,13 +24,17 @@ struct calibrationRunNumbers{
   unsigned int led;
 };
 
-std::vector<std::vector<Channel>*>* parseRootTree(TTree* dataTree,
+std::vector<Event*>* parseRootTree(TTree* dataTree,
                                                   unsigned int uplinkMin,
                                                   unsigned int uplinkMax,
                                                   unsigned int nAdcs,
                                                   const std::map<unsigned int, std::map<unsigned int, double>>& pedestals,
                                                   const std::map<unsigned int, std::map<unsigned int, double>>& gains);
 
+std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
+                                                  unsigned int uplinkMin,
+                                                  unsigned int uplinkMax,
+                                                  unsigned int nAdcs);
 
 
 void produceGains(TTree* t,

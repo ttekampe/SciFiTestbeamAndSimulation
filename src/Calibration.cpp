@@ -31,13 +31,6 @@
 
 
 
-
-
-
-
-
-
-
 TString removePath(TString str){
   Ssiz_t posOfSlash = str.Last('/');
   if(posOfSlash != kNPOS){
@@ -46,14 +39,14 @@ TString removePath(TString str){
   return str;
 }
 
-std::vector<std::vector<Channel>*>* parseRootTree(TTree* dataTree,
+std::vector<Event*>* parseRootTree(TTree* dataTree,
                                                   unsigned int uplinkMin,
                                                   unsigned int uplinkMax,
                                                   unsigned int nAdcs,
                                                   const std::map<unsigned int, std::map<unsigned int, double>>& pedestals,
                                                   const std::map<unsigned int, std::map<unsigned int, double>>& gains){
 
-  std::vector<std::vector<Channel>*>* dataVector = new std::vector<std::vector<Channel>*>(dataTree->GetEntriesFast());
+  std::vector<Event*>* dataVector = new std::vector<Event*>(dataTree->GetEntriesFast());
 
   const unsigned int nUplinks = uplinkMax-uplinkMin+1;
   float** adcVals = new float*[nUplinks];
@@ -61,24 +54,23 @@ std::vector<std::vector<Channel>*>* parseRootTree(TTree* dataTree,
     adcVals[i] = new float[nAdcs];
   }
 
-
+  dataTree->SetBranchStatus("*", 0);
   for(unsigned int uplink=uplinkMin; uplink<=uplinkMax; ++uplink){
     std::string branchName = "Uplink_" + std::to_string(uplink) + "_adc_";
     for(unsigned int adc = 0; adc<nAdcs; ++adc){
-      dataTree->SetBranchStatus("*", 0);
       dataTree->SetBranchStatus((branchName + std::to_string(adc+1)).c_str(), 1);
-      dataTree->SetBranchAddress((branchName + std::to_string(adc+1)).c_str(), &adcVals[uplink][adc]);
+      dataTree->SetBranchAddress((branchName + std::to_string(adc+1)).c_str(), &adcVals[uplink-uplinkMin][adc]);
     }
   }
     for(unsigned int i = 0; i < dataTree->GetEntriesFast(); ++i){
       dataTree->GetEntry(i);
-      std::vector<Channel>* event = new std::vector<Channel>(nAdcs * (uplinkMax-uplinkMin+1) );
+      Event* event = new Event(nAdcs * (uplinkMax-uplinkMin+1) );
       for(unsigned int uplink=uplinkMin; uplink<=uplinkMax; ++uplink){
         for(unsigned int adc = 0; adc < nAdcs; ++adc){
           Channel c;
           c.Uplink = uplink;
-          c.ChannelNumber = adc;
-          c.AdcValue = (adcVals[uplink][adc] - pedestals.at(uplink).at(adc)) / gains.at(uplink).at(adc);
+          c.ChannelNumber = adc+1;
+          c.AdcValue = (adcVals[uplink-uplinkMin][adc] - pedestals.at(uplink).at(adc+1)) / gains.at(uplink).at(adc+1);
           event->at(adc + (uplink - uplinkMin)*nAdcs ) = c;
         }
       }
@@ -94,9 +86,71 @@ std::vector<std::vector<Channel>*>* parseRootTree(TTree* dataTree,
   return dataVector;
 }
 
+std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
+                                                  unsigned int uplinkMin,
+                                                  unsigned int uplinkMax,
+                                                  unsigned int nAdcs){
+
+  std::vector<Event*>* dataVector = new std::vector<Event*>(dataTree->GetEntriesFast());
+
+  const unsigned int nUplinks = uplinkMax-uplinkMin+1;
+  float** adcVals = new float*[nUplinks];
+  for(unsigned int i = 0; i< nUplinks; ++i){
+    adcVals[i] = new float[nAdcs];
+  }
+
+//  std::vector<std::vector<float> > adcVals(nUplinks, std::vector<float>(nAdcs));
+
+  dataTree->SetBranchStatus("*", 0);
+  for(unsigned int uplink=uplinkMin; uplink<=uplinkMax; ++uplink){
+    std::string branchName = "Uplink_" + std::to_string(uplink) + "_adc_";
+    for(unsigned int adc = 0; adc<nAdcs; ++adc){
+      dataTree->SetBranchStatus((branchName + std::to_string(adc+1)).c_str(), 1);
+      dataTree->SetBranchAddress((branchName + std::to_string(adc+1)).c_str(), &adcVals[uplink-uplinkMin][adc]);
+    }
+  }
+  std::cout << "channels per event: " << ( nAdcs * (uplinkMax-uplinkMin+1) ) << "\n";
+    for(unsigned int i = 0; i < dataTree->GetEntriesFast(); ++i){
+      dataTree->GetEntry(i);
+      Event* event = new Event(nAdcs * (uplinkMax-uplinkMin+1) );
+      for(unsigned int uplink=uplinkMin; uplink<=uplinkMax; ++uplink){
+        for(unsigned int adc = 0; adc < nAdcs; ++adc){
+//          std::cout << "stroring adcVals[" << uplink-uplinkMin << "][" << adc << "] at " <<  (adc + (uplink - uplinkMin)*nAdcs) << "\n";
+          Channel c;
+          c.Uplink = uplink;
+          c.ChannelNumber = adc+1;
+          if(adcVals[uplink-uplinkMin][adc]>0)
+            c.AdcValue = adcVals[uplink-uplinkMin][adc];
+          else
+            c.AdcValue = 0;
+          if(adcVals[uplink-uplinkMin][adc]>10 || adcVals[uplink-uplinkMin][adc] <-10){
+          }
+//          std::cout << uplink << "\t" << adc << "\t" << adcVals[uplink-uplinkMin][adc] << "\n";
+          event->at(adc + (uplink - uplinkMin)*nAdcs ) = c;
+        }
+      }
+      dataVector->at(i) = event;
+    }
+
+//  dataTree->ResetBranchAddresses();
+  for(unsigned int i = 0; i< nUplinks; ++i){
+    delete[] adcVals[i];
+  }
+  delete[] adcVals;
+
+  return dataVector;
+}
 
 
-void produceGains(TTree* t, const unsigned int uplinkMin, const unsigned int uplinkMax, const unsigned int adcIDmin, const unsigned int adcIDmax, const unsigned int maxGaussians, TString fileName, std::string savePath){
+
+void produceGains(TTree* t,
+                  const unsigned int uplinkMin,
+                  const unsigned int uplinkMax,
+                  const unsigned int adcIDmin,
+                  const unsigned int adcIDmax,
+                  const unsigned int maxGaussians,
+                  TString fileName,
+                  std::string savePath){
   RooMsgService::instance().setGlobalKillBelow(RooFit::ERROR);
   RooMsgService::instance().setSilentMode(true);
   lhcb::lhcbStyle();
@@ -196,7 +250,7 @@ void produceGains(TTree* t, const unsigned int uplinkMin, const unsigned int upl
       bool isAGoodFit = ((hesseStatusCode==0) && (migradStatusCode==0) && (covarianceQuality==3));// && (minosStatusCode==0) );
 
 
-      if(!isAGoodFit){
+      if(!isAGoodFit || gain.getError() == 0.0){
         ++failedFits;
         std::cout << "Fit for uplink " << uplinkNumber << " and adc " << adcNumber << " failed!" << std::endl;
         fs->Print("v");
@@ -294,7 +348,10 @@ unsigned int runNumberFromFilename(std::string filename){
   return std::stoi(filename.substr( filename.find("_")+1, filename.find("_", filename.find("_")+1)-filename.find("_")-1 ));
 }
 
-std::map<unsigned int, std::map<unsigned int, double> > getPedestals(const std::string fileName, const unsigned int uplinkMin, const unsigned int uplinkMax, const unsigned int nAdcs){
+std::map<unsigned int, std::map<unsigned int, double> > getPedestals(const std::string fileName,
+                                                                     const unsigned int uplinkMin,
+                                                                     const unsigned int uplinkMax,
+                                                                     const unsigned int nAdcs){
   TFile pedestalFile(fileName.c_str(), "READ");
   if(!pedestalFile.IsOpen()){
     std::cerr << "unable to open pedestal file " << fileName << std::endl;
