@@ -1,5 +1,6 @@
 //from std
 #include <vector>
+#include <cmath>
 
 //from ROOT
 #include "TFile.h"
@@ -21,9 +22,38 @@ namespace po = boost::program_options;
 struct config{
   std::string file2analyse;
   bool debug;
+  bool simulation;
 };
 
 
+void addClusterShapeToHist(const Cluster& cl, std::vector<std::vector<double> >& adcValuesRelativeToSeed){
+  int clusterSeed = cl.GetSeedChannelNumber();
+  for(const auto& chan : cl.GetRelatedChannels()){
+    unsigned int position = std::abs(int(chan.ChannelNumber) - clusterSeed);
+    if (cl.GetClusterSize() <= adcValuesRelativeToSeed.size()){
+      adcValuesRelativeToSeed.at(position).push_back(chan.AdcValue);
+    }
+  }
+}
+
+std::pair<double , double> getMean(std::vector<double> data){
+  if(data.empty()){
+    return std::make_pair(0., 0.);
+  }
+  double mean{0.};
+  for(const auto& entry : data){
+    mean += entry;
+  }
+  mean /= data.size();
+
+  double stdDev{0.};
+  for(const auto& entry : data){
+    stdDev += (mean - entry) * (mean - entry);
+  }
+  stdDev = std::sqrt(stdDev / (data.size() - 1.) );
+
+  return std::make_pair(mean, stdDev);
+}
 
 int parseOptions(config &c, int argc, char *argv[]){
 
@@ -32,6 +62,7 @@ int parseOptions(config &c, int argc, char *argv[]){
   desc.add_options()
     ("help", "show this help")
     ("file,f", po::value<std::string>(&c.file2analyse), "corrected test beam data file")
+    ("simulation,s", po::bool_switch(&c.simulation), "Simulated input?")
     ("debug,2", po::bool_switch(&c.debug), "debug output")
     ;
 
@@ -58,20 +89,36 @@ int main(int argc, char *argv[]){
   }
 
   TFile inputFile(c.file2analyse.c_str(), "READ");
-  TTree* inputTree = dynamic_cast<TTree*>( inputFile.Get("rawData") );
+  TTree* inputTree;
+  if(c.simulation){
+    inputTree = dynamic_cast<TTree*>( inputFile.Get("layer_0") );
+  }
+  else{
+    inputTree = dynamic_cast<TTree*>( inputFile.Get("rawData") );
+  }
+
   if(!inputTree){
     std::cerr << "Tree not found!" << std::endl;
     return 0;
   }
 
-  std::vector<std::vector<Channel>*>* data = parseCorrectedRootTree(inputTree, 3, 4, 128);
+  std::vector<std::vector<Channel>*>* data;
+
+  if(c.simulation){
+    data = parseCorrectedRootTree(inputTree, 1, 4, 128);
+  }
+  else{
+    data = parseCorrectedRootTree(inputTree, 3, 4, 128);
+  }
 
   std::vector<Cluster*> clusterVec;
 
   for (const auto& event : *data){
-                                                  //neighbor, seed, sum, maxsize
+                                                  //neighbor, seed, sum, maxsize simu 3, 5, 8
     FindClustersInEventFTStyle(clusterVec, *event, 1.5, 2.5, 4.5, 100, false);
-//    FindClustersInEvent(clusterVec, *event, 1.5, 2.5, 4.5, 4, false);
+//    FindClustersInEventFTStyle(clusterVec, *event, 0.5, 1.5, 1.5, 100, false);
+
+
   }
 
   std::cout << "Found " << clusterVec.size() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
@@ -91,17 +138,18 @@ int main(int argc, char *argv[]){
   double d_maxCharge = 0.0;
   resultTree->Branch("maxCharge", &d_maxCharge, "maxCharge/D");
 
-  int i_clusterSize = 0.0;
+  int i_clusterSize = 0;
   resultTree->Branch("clusterSize", &i_clusterSize, "clusterSize/I");
 
+//  double d_clusterShape = 0.0;
+//  resultTree->Branch("clusterShape", &d_clusterShape, "clusterShape/D");
+  TH1D clusterShape("clusterShape", "", 10, 0, 10);
 
-//  TH1D chargeWeightedMeanHist("chargeWeightedMeanHist", "", 6, 0, 6)
-//  TH1D hitWeightedMeanHist
-//  TH1D sumChargeHist
-//  TH1D maxChargeHist
-//  TH1I clusterSizeHist
+  std::vector<std::vector<double> > adcValuesRelativeToSeed(10);
+
 
   for(const auto& clust : clusterVec){
+    addClusterShapeToHist(*clust, adcValuesRelativeToSeed);
     d_chargeWeightedMean = clust->GetChargeWeightedMean();
     d_hitWeightedMean = clust->GetHitWeightedMean();
     d_sumCharge = clust->GetSumOfAdcValues();
@@ -109,7 +157,15 @@ int main(int argc, char *argv[]){
     i_clusterSize = clust->GetClusterSize();
     resultTree->Fill();
   }
+  std::cout << "Filling cluster shape histogram..\n";
+  std::pair<double, double> current(0., 0.);
+  for(unsigned int i = 0; i<adcValuesRelativeToSeed.size(); ++i){
+    current = getMean(adcValuesRelativeToSeed.at(i));
+    clusterShape.SetBinContent(i+1, current.first);
+    clusterShape.SetBinError(i+1, current.second);
+  }
 
+  clusterShape.Write();
   resultTree->Write();
   results.Close();
 

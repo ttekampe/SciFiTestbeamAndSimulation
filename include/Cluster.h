@@ -27,6 +27,9 @@ class Cluster{
   unsigned int GetClusterSize() const;
   unsigned int GetMinChannel() const;
   unsigned int GetMaxChannel() const;
+  unsigned int GetSeedChannelNumber() const;
+
+  const std::vector<Channel> &GetRelatedChannels() const;
 
 };
 

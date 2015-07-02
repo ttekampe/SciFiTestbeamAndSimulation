@@ -89,3 +89,20 @@ unsigned int Cluster::GetMaxChannel() const{
   }
   return maxChannel;
 }
+
+unsigned int Cluster::GetSeedChannelNumber() const{
+  double maxAdcValue{0.};
+  unsigned int ChannelNumber = 9999;
+  for(const auto& chan : RelatedChannels){
+    if(chan.AdcValue > maxAdcValue){
+      maxAdcValue = chan.AdcValue;
+      ChannelNumber = chan.ChannelNumber;
+    }
+  }
+  return ChannelNumber;
+}
+
+
+const std::vector<Channel> &Cluster::GetRelatedChannels() const{
+  return RelatedChannels;
+}

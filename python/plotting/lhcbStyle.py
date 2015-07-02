@@ -98,9 +98,9 @@ def setLHCbStyle():
     lhcbStyle.SetStatBorderSize(0)
     lhcbStyle.SetStatFont(lhcbFont)
     lhcbStyle.SetStatFontSize(0.05)
-    lhcbStyle.SetStatX(0.9)
-    lhcbStyle.SetStatY(0.9)
-    lhcbStyle.SetStatW(0.25)
+    lhcbStyle.SetStatX(0.93)
+    lhcbStyle.SetStatY(0.88)
+    lhcbStyle.SetStatW(0.20)
     lhcbStyle.SetStatH(0.15)
 
     # put tick marks on top and RHS of plots
