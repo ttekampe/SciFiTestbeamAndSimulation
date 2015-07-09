@@ -3,13 +3,7 @@
 #include <iostream>
 #include <vector>
 
-Cluster::Cluster(){}
 
-Cluster::~Cluster(){}
-
-void Cluster::Clear(){
-  RelatedChannels.clear();
-}
 
 void Cluster::AddChannel(const unsigned int uplNumber, const unsigned int chanNumber, const double adcValue){
   Channel c;
@@ -71,9 +65,6 @@ double Cluster::GetMaximumAdcValue() const{
   return maxAdcValue;
 }
 
-unsigned int Cluster::GetClusterSize() const{
-  return RelatedChannels.size();
-}
 
 unsigned int Cluster::GetMinChannel() const{
   unsigned int minChannel{9999999};
@@ -103,6 +94,3 @@ unsigned int Cluster::GetSeedChannelNumber() const{
 }
 
 
-const std::vector<Channel> &Cluster::GetRelatedChannels() const{
-  return RelatedChannels;
-}

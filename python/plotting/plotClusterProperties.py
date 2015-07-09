@@ -136,63 +136,63 @@ for p in plots:
 	can.SaveAs("clusterPlots_Pos" + cfg.position + ".pdf")
 
 
-hist = f.Get("clusterShape")
-hist_sim = f_sim.Get("clusterShape")
-
-hist.GetXaxis().SetRangeUser(0, 10)
-hist_sim.GetXaxis().SetRangeUser(0, 10)
-
-hist.GetYaxis().SetRangeUser(0, 50)
-hist_sim.GetYaxis().SetRangeUser(0, 50)
-
-hist.GetXaxis().SetTitle("Channel relative to seed")
-hist.GetYaxis().SetTitle("Adc response")
-hist.SetName("Data")
-hist.SetStats(True)
-
-hist_sim.GetXaxis().SetTitle("Channel relative to seed")
-hist_sim.GetYaxis().SetTitle("Adc response")
-hist_sim.SetName("Simulation")
-hist_sim.SetStats(True)
-
-hist_sim.SetMarkerColor(kRed)
-hist_sim.SetLineColor(kRed)
-hist_sim.SetMarkerStyle(kOpenCircle)
-
-
-
-hist.Draw("e")
-can.Update()
-statbox = hist.GetListOfFunctions().FindObject('stats')
-#statbox.SetLabel("Data")
+#hist = f.Get("clusterShape")
+#hist_sim = f_sim.Get("clusterShape")
+#
+#hist.GetXaxis().SetRangeUser(0, 10)
+#hist_sim.GetXaxis().SetRangeUser(0, 10)
+#
+#hist.GetYaxis().SetRangeUser(0, 50)
+#hist_sim.GetYaxis().SetRangeUser(0, 50)
+#
+#hist.GetXaxis().SetTitle("Channel relative to seed")
+#hist.GetYaxis().SetTitle("Adc response")
+#hist.SetName("Data")
+#hist.SetStats(True)
+#
+#hist_sim.GetXaxis().SetTitle("Channel relative to seed")
+#hist_sim.GetYaxis().SetTitle("Adc response")
+#hist_sim.SetName("Simulation")
+#hist_sim.SetStats(True)
+#
+#hist_sim.SetMarkerColor(kRed)
+#hist_sim.SetLineColor(kRed)
+#hist_sim.SetMarkerStyle(kOpenCircle)
+#
+#
+#
+#hist.Draw("e")
+#can.Update()
+#statbox = hist.GetListOfFunctions().FindObject('stats')
+##statbox.SetLabel("Data")
+##hist_sim.Draw("e")
+##statbox_sim = hist_sim.GetListOfFunctions().FindObject('stats')
+##statbox_sim.SetName("Simulation")
+#
+#statbox.SetX1NDC(0.2)
+#statbox.SetX2NDC(0.4)
+##statbox.SetY1NDC(y1)
+##statbox.SetY2NDC(y2)
+#
 #hist_sim.Draw("e")
+#can.Update()
 #statbox_sim = hist_sim.GetListOfFunctions().FindObject('stats')
-#statbox_sim.SetName("Simulation")
-
-statbox.SetX1NDC(0.2)
-statbox.SetX2NDC(0.4)
-#statbox.SetY1NDC(y1)
-#statbox.SetY2NDC(y2)
-
-hist_sim.Draw("e")
-can.Update()
-statbox_sim = hist_sim.GetListOfFunctions().FindObject('stats')
-statbox_sim.SetTextColor(kRed)
-
-
-
-
-if hist.GetMaximum() > hist_sim.GetMaximum():
-	hist.Draw("e")
-	gPad.Modified()
-	hist_sim.Draw("esames")
-else:
-	hist_sim.Draw("e")
-	gPad.Modified()
-	hist.Draw("esames")
-
-
-
-
-can.SaveAs("clusterPlots_Pos" + cfg.position + ".pdf")
+#statbox_sim.SetTextColor(kRed)
+#
+#
+#
+#
+#if hist.GetMaximum() > hist_sim.GetMaximum():
+#	hist.Draw("e")
+#	gPad.Modified()
+#	hist_sim.Draw("esames")
+#else:
+#	hist_sim.Draw("e")
+#	gPad.Modified()
+#	hist.Draw("esames")
+#
+#
+#
+#
+#can.SaveAs("clusterPlots_Pos" + cfg.position + ".pdf")
 can.SaveAs("clusterPlots_Pos" + cfg.position + ".pdf]")

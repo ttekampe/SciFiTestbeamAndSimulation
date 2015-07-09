@@ -66,8 +66,8 @@ int main(int argc, char *argv[]){
   std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark << "\tled: " << calNum.led << std::endl;
 
 
-  c.darkFileName = "/data/testbeam/btsoftware_" + std::to_string(calNum.dark) + "_calib_dark_ntuple.root";
-  c.ledFileName = "/data/testbeam/btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
+  c.darkFileName = "/data/testbeam/data/btsoftware_" + std::to_string(calNum.dark) + "_calib_dark_ntuple.root";
+  c.ledFileName = "/data/testbeam/data/btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
 
   TFile darkFile(c.darkFileName.c_str(), "READ");
   TFile dataFile(c.file2correct.c_str(), "READ");
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]){
   }
 
 
-  TString newFileName = "/data/testbeam/corrected" + c.file2correct;
+  TString newFileName = "/data/testbeam/data/corrected" + c.file2correct;
   newFileName.ReplaceAll(".root", "_corrected.root");
 
 

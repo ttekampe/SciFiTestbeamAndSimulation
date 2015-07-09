@@ -1,101 +1,54 @@
 //from here
+#include "ClusterCreator.h"
 #include "Cluster.h"
+
 
 //from std
 #include <iostream>
-#include <vector>
-
-//void FindClustersInEventMax(std::vector<Cluster*>& Clusters
-//                            const std::vector<Channel>& dataVector,
-//                            const float neighbour_threshold,
-//                            const float seed_threshold,
-//                            const float sum_threshold,
-//                            )
-//{
-//
-//  Cluster* currentCluster = nullptr;
-//
-//  for(std::vector<Channel>::const_iterator chan = dataVector.begin(); chan != dataVector.end(); ++chan){
-//    if( chan->AdcValue > neighbour_threshold){ //look for channels exceeding cluster threshold
-//      if(!currentCluster){
-//        currentCluster = new Cluster();
-//        currentCluster->AddChannel(chan->ChannelNumber, chan->AdcValue);
-//      }
-//      else{
-//        currentCluster->AddChannel(chan->ChannelNumber, chan->AdcValue);
-//      }
-//    }
-//    if( chan->AdcValue <= neighbour_threshold && currentCluster){
-//      if(currentCluster->GetMaximumAdcValue() > seed_threshold && currentCluster->GetSumOfAdcValues() > sum_threshold) Clusters.push_back(currentCluster);
-//      currentCluster = nullptr;
-//    }
-//  }
-//}
+#include <utility>
 
 
-void FindClustersInEvent(std::vector<Cluster*>& clusterVector,
-                         const std::vector<Channel>& event,
-                         const double neighbourThreshold,
-                         const double seedThreshold,
-                         const double sumThreshold,
-                         const unsigned int maxClusterSize,
-                         bool debug){
+ClusterCreator::~ClusterCreator(){
+  for(auto& clPtr : clusters){
+    delete clPtr;
+  }
+}
 
-  if(debug) std::cout << "event has " << event.size() << " channels" << std::endl;
-  bool possibleMultipleClusters = false;
+void ClusterCreator::FindClustersInEventMax(
+                            const Event& event
+                            ,const double neighbour_threshold
+                            ,const double seed_threshold
+                            ,const double sum_threshold
+                            )
+{
+
   Cluster* currentCluster = nullptr;
-  for(std::vector<Channel>::const_iterator chan = event.begin(); chan != event.end(); ++chan){
-    if(debug) std::cout << "search at channel " << chan->ChannelNumber << " with adc value " << chan->AdcValue << std::endl;
-    std::vector<Channel>::const_iterator storeCurrentChannel;
-    if (chan->AdcValue > seedThreshold && currentCluster == nullptr){ //create a new cluster if there is none atm  (&& currentCluster == nullptr should have no effect here)
-      currentCluster = new Cluster();
-      possibleMultipleClusters = false;
-      currentCluster->AddChannel(chan->Uplink, chan->ChannelNumber, chan->AdcValue);
-      storeCurrentChannel = chan;
-      if(chan != event.begin()){ //add all neighbours in backward direction
-        do{
-          --chan;
-          if(debug) std::cout << "going down to channel " << chan->ChannelNumber << " with adc value " << chan->AdcValue << std::endl;
-          if(chan->AdcValue > neighbourThreshold) currentCluster->AddChannel(chan->Uplink, chan->ChannelNumber, chan->AdcValue);
-        }while(chan->AdcValue > neighbourThreshold && chan != event.begin());
+
+  for(Event::const_iterator chan = event.begin(); chan != event.end(); ++chan){
+    if( chan->AdcValue > neighbour_threshold){ //look for channels exceeding cluster threshold
+      if(!currentCluster){
+        currentCluster = new Cluster();
+        currentCluster->AddChannel(chan->Uplink, chan->ChannelNumber, chan->AdcValue);
       }
-      chan = storeCurrentChannel;
-      if(chan != event.end()-1){ //add all neighbours in backward direction
-        do{
-          ++chan;
-          if(debug) std::cout << "going up to channel " << chan->ChannelNumber << " with adc value " << chan->AdcValue << std::endl;
-          if(chan->AdcValue > neighbourThreshold) currentCluster->AddChannel(chan->Uplink, chan->ChannelNumber, chan->AdcValue);
-          if(chan->AdcValue > seedThreshold && (chan-1)->AdcValue < seedThreshold) possibleMultipleClusters = true;
-        }while(chan->AdcValue > neighbourThreshold && chan != event.end()-1);
+      else{
+        currentCluster->AddChannel(chan->Uplink, chan->ChannelNumber, chan->AdcValue);
       }
     }
-    if(currentCluster == nullptr) continue;
-    if(currentCluster->GetSumOfAdcValues() > sumThreshold){
-      if(debug) std::cout << "storing cluster" << std::endl;
-      //if cluster size is greater than max cluster size
-      if(currentCluster->GetClusterSize() >= 2*maxClusterSize && possibleMultipleClusters){// try to split the clusters
-        std::cout << "cluster splitting needed!" << std::endl;
-        }
-//      if(currentCluster->GetClusterSize() > maxClusterSize){//just reduce the cluster
-//        currentCluster->Resize(maxClusterSize);
-//       }
-      clusterVector.push_back(currentCluster); //store the cluster
+    if( chan->AdcValue <= neighbour_threshold && currentCluster){
+      if(currentCluster->GetMaximumAdcValue() > seed_threshold && currentCluster->GetSumOfAdcValues() > sum_threshold) clusters.push_back(currentCluster);
+      currentCluster = nullptr;
     }
-    currentCluster = nullptr; //reset the pointer
   }
 }
 
 
-
-
-void FindClustersInEventBoole(std::vector<Cluster*>& clusterVector,
-                                const std::vector<Channel>& event,
-                                const double neighbourThreshold,
-                                const double seedThreshold,
-                                const double sumThreshold,
-                                const unsigned int maxClusterSize,
-                                bool debug)
-  {
+void ClusterCreator::FindClustersInEventBoole(const Event& event,
+                              const double neighbourThreshold,
+                              const double seedThreshold,
+                              const double sumThreshold,
+                              const int maxClusterSize,
+                              bool debug)
+{
   std::vector<Channel>::const_iterator lastStopDigitIter = event.begin(); // end digit of last cluster, to prevent overlap
 
   // Since Digit Container is sorted wrt channelID, clusters are defined searching for bumps of ADC Count
@@ -172,7 +125,7 @@ void FindClustersInEventBoole(std::vector<Cluster*>& clusterVector,
           }
 
         } else {
-          // IF the next digit does not exist in the container (i.e. done with all clusterisation)
+          // IF the next digit does not exist in the container (i.e. done with all ClusterCreator)
           ContinueStopLoop = false;
         }
 
@@ -246,7 +199,7 @@ void FindClustersInEventBoole(std::vector<Cluster*>& clusterVector,
 
 
 
-          clusterVector.push_back(currentCluster);
+          clusters.push_back(currentCluster);
 
 
         } // end of Cluster satisfies charge / size requirements
@@ -261,8 +214,5 @@ void FindClustersInEventBoole(std::vector<Cluster*>& clusterVector,
       ++seedDigitIter;
 
     } // END of loop over Digits
-  }
-
-
-
+}
 

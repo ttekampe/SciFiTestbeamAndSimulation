@@ -20,7 +20,7 @@ void FindClustersInEvent(std::vector<Cluster*>& clusterVector,
                          bool debug = {false});
 
 
-void FindClustersInEventFTStyle(std::vector<Cluster*>& clusterVector,
+void FindClustersInEventBoole(std::vector<Cluster*>& clusterVector,
                                 const std::vector<Channel>& event,
                                 const double neighbourThreshold,
                                 const double seedThreshold,

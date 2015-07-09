@@ -286,8 +286,9 @@ std::map<unsigned int, std::map<unsigned int, double>> readGains(std::string fil
   int uplinkNumber{0};
   int adcNumber{0};
   double gain{0};
-  std::map<unsigned int, double> means;
-  std::map<unsigned int, double> goodGains;
+
+//  std::map<unsigned int, double> means;
+//  std::map<unsigned int, double> goodGains;
 
 
   std::map<unsigned int, std::map<unsigned int, double>> gains;
@@ -296,34 +297,34 @@ std::map<unsigned int, std::map<unsigned int, double>> readGains(std::string fil
       if(ss >> uplinkNumber >> adcNumber >> gain){
         std::cout << uplinkNumber << "\t" << adcNumber << "\t" << gain << std::endl;
 
-        if(means.find( uplinkNumber ) == means.end()){
-          means[uplinkNumber] = 0.;
-          goodGains[uplinkNumber] = 0.;
-        }
+//        if(means.find( uplinkNumber ) == means.end()){
+//          means[uplinkNumber] = 0.;
+//          goodGains[uplinkNumber] = 0.;
+//        }
 
         gains[uplinkNumber][adcNumber] = gain;
 
-        if(!gain == 0){
-          means[uplinkNumber] += gain;
-          ++goodGains[uplinkNumber];
-        }
+//        if(!gain == 0){
+//          means[uplinkNumber] += gain;
+//          ++goodGains[uplinkNumber];
+//        }
       }
   }
-  // replace gains from failed fits by the mean of all gains of the same uplink
-  for(auto& uplink : gains){
-    means[uplink.first] /= goodGains[uplink.first];
-    for(auto& adc : uplink.second){
-      if (adc.second == 0){
-        std::cout << "replacing " << adc.second << " by " << means[uplink.first] << std::endl;
-        adc.second = means[uplink.first];
-      }
-    }
-  }
+  // replace gains from failed fits by the mean of all gains of the same uplink maybe not a good idea!
+//  for(auto& uplink : gains){
+//    means[uplink.first] /= goodGains[uplink.first];
+//    for(auto& adc : uplink.second){
+//      if (adc.second == 0){
+//        std::cout << "replacing " << adc.second << " by " << means[uplink.first] << std::endl;
+//        adc.second = means[uplink.first];
+//      }
+//    }
+//  }
   return gains;
 }
 
 calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber){
-  std::ifstream fileCatalogue("/data/testbeam/runNumbers.txt");
+  std::ifstream fileCatalogue("/data/testbeam/data/runNumbers.txt");
   unsigned int currentRunNumber = 0;
   unsigned int currentLedNumber = 0;
   unsigned int currentDarkNumber = 0;
@@ -412,7 +413,7 @@ void correctFile(TTree* tree2correct,
                  TString newFileName){
 
   newFileName = removePath(newFileName);
-  TFile correctedFile(("/data/testbeam/corrected/" + newFileName).Data(), "RECREATE");
+  TFile correctedFile(("/data/testbeam/data/corrected/" + newFileName).Data(), "RECREATE");
   TTree* correctedTree = new TTree("rawData", "rawData");
 
   //setup fill mechanism for new TTree
@@ -440,7 +441,8 @@ void correctFile(TTree* tree2correct,
     for(unsigned int uplink = uplinkMin; uplink<=uplinkMax; ++uplink){
       for(unsigned int adc = 1; adc<=nAdcs; ++adc){
 //      std::cout << uplink << "\t" << adc << "\n";
-      correctedAdcVals[uplink - uplinkMin][adc-1] = ( rawAdcVals[uplink - uplinkMin][adc-1] - pedestals.at(uplink).at(adc) ) / gains.at(uplink).at(adc);
+      if (gains.at(uplink).at(adc)) correctedAdcVals[uplink - uplinkMin][adc-1] = ( rawAdcVals[uplink - uplinkMin][adc-1] - pedestals.at(uplink).at(adc) ) / gains.at(uplink).at(adc); //if gain is not 0
+      else correctedAdcVals[uplink - uplinkMin][adc-1] = 0.0; // gain fit failed!
 //      std::cout << correctedAdcVals[uplink - uplinkMin][adc-1] << std::endl;
       }
     }

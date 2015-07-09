@@ -14,9 +14,9 @@ class Cluster{
   std::vector<Channel> RelatedChannels;
 
   public:
-  Cluster();
-  ~Cluster();
-  void Clear();
+  Cluster(){}
+  ~Cluster(){}
+  void Clear() {RelatedChannels.clear();}
   void AddChannel(const unsigned int uplNumber, const unsigned int chanNumber, const double adcValue);
   void RemoveChannel(const unsigned int chanNumber);
   void Resize(const unsigned int newsize);
@@ -24,12 +24,12 @@ class Cluster{
   double GetHitWeightedMean() const;
   double GetSumOfAdcValues() const;
   double GetMaximumAdcValue() const;
-  unsigned int GetClusterSize() const;
+  unsigned int GetClusterSize() const {return RelatedChannels.size();}
   unsigned int GetMinChannel() const;
   unsigned int GetMaxChannel() const;
   unsigned int GetSeedChannelNumber() const;
 
-  const std::vector<Channel> &GetRelatedChannels() const;
+  const std::vector<Channel> &GetRelatedChannels() const {return RelatedChannels;}
 
 };
 
