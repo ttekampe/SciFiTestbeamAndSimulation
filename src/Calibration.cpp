@@ -323,7 +323,7 @@ std::map<unsigned int, std::map<unsigned int, double>> readGains(std::string fil
   return gains;
 }
 
-calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber, std::string catalogueFileName){
+calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber, const std::string catalogueFileName){
 //  std::ifstream fileCatalogue("/data/testbeam/data/runNumbers.txt");
   std::ifstream fileCatalogue(catalogueFileName);
   unsigned int currentRunNumber = 0;
