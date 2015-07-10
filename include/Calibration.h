@@ -25,16 +25,16 @@ struct calibrationRunNumbers{
 };
 
 std::vector<Event*>* parseRootTree(TTree* dataTree,
-                                                  unsigned int uplinkMin,
-                                                  unsigned int uplinkMax,
-                                                  unsigned int nAdcs,
-                                                  const std::map<unsigned int, std::map<unsigned int, double>>& pedestals,
-                                                  const std::map<unsigned int, std::map<unsigned int, double>>& gains);
+                                  unsigned int uplinkMin,
+                                  unsigned int uplinkMax,
+                                  unsigned int nAdcs,
+                                  const std::map<unsigned int, std::map<unsigned int, double>>& pedestals,
+                                  const std::map<unsigned int, std::map<unsigned int, double>>& gains);
 
 std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
-                                                  unsigned int uplinkMin,
-                                                  unsigned int uplinkMax,
-                                                  unsigned int nAdcs);
+                                            unsigned int uplinkMin,
+                                            unsigned int uplinkMax,
+                                            unsigned int nAdcs);
 
 
 void produceGains(TTree* t,
@@ -49,7 +49,7 @@ void produceGains(TTree* t,
 
 std::map<unsigned int, std::map<unsigned int, double>> readGains(std::string fileName);
 
-calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber);
+calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber, const std::string catalogueFileName);
 
 unsigned int runNumberFromFilename(std::string filename);
 

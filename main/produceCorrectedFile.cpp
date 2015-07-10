@@ -61,7 +61,7 @@ int main(int argc, char *argv[]){
     return 0;
   }
   const unsigned int runNumber = runNumberFromFilename(c.file2correct);
-  calibrationRunNumbers calNum = lookUpCalibrationFiles(runNumber);
+  calibrationRunNumbers calNum = lookUpCalibrationFiles(runNumber, "/data/testbeam/data/runNumbers.txt");
 
   std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark << "\tled: " << calNum.led << std::endl;
 

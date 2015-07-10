@@ -157,7 +157,7 @@ void produceGains(TTree* t,
   TString saveName = fileName;
   saveName.Remove(0, saveName.Last('/')+1);
   saveName.ReplaceAll(".root", "_gain.txt");
-  std::ofstream gainFile("/home/tobi/SciFi/results/gains/" + saveName);
+  std::ofstream gainFile(savePath + saveName);
   gainFile << "uplinkNumber\tadcNumber\tgain\tgainErr" << std::endl;
 
   TString canvasName = saveName;
@@ -323,8 +323,9 @@ std::map<unsigned int, std::map<unsigned int, double>> readGains(std::string fil
   return gains;
 }
 
-calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber){
-  std::ifstream fileCatalogue("/data/testbeam/data/runNumbers.txt");
+calibrationRunNumbers lookUpCalibrationFiles(const unsigned int runNumber, std::string catalogueFileName){
+//  std::ifstream fileCatalogue("/data/testbeam/data/runNumbers.txt");
+  std::ifstream fileCatalogue(catalogueFileName);
   unsigned int currentRunNumber = 0;
   unsigned int currentLedNumber = 0;
   unsigned int currentDarkNumber = 0;
@@ -412,8 +413,10 @@ void correctFile(TTree* tree2correct,
                  const unsigned int nAdcs,
                  TString newFileName){
 
-  newFileName = removePath(newFileName);
-  TFile correctedFile(("/data/testbeam/data/corrected/" + newFileName).Data(), "RECREATE");
+//  newFileName = removePath(newFileName);
+//  TFile correctedFile(("/data/testbeam/data/corrected/" + newFileName).Data(), "RECREATE");
+
+  TFile correctedFile(newFileName.Data(), "RECREATE");
   TTree* correctedTree = new TTree("rawData", "rawData");
 
   //setup fill mechanism for new TTree
