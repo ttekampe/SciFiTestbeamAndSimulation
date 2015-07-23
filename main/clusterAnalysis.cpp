@@ -26,6 +26,7 @@ struct config{
   std::string file2analyse;
   bool debug;
   bool simulation;
+  double correctLightYieldInSim;
   std::string clusterAlg;
 };
 
@@ -68,7 +69,8 @@ int parseOptions(config &c, int argc, char *argv[]){
     ("help", "show this help")
     ("file,f", po::value<std::string>(&c.file2analyse), "corrected test beam data file")
     ("simulation,s", po::bool_switch(&c.simulation), "Simulated input?")
-    ("clusteralg,c", po::value<std::string>(&c.clusterAlg)->default_value("b", "clustering algorithm: b for Boole or m for Maxs"))
+    ("clusteralg,c", po::value<std::string>(&c.clusterAlg)->default_value("b"), "clustering algorithm: b for Boole or m for Maxs")
+    ("", po::value<double>(&c.correctLightYieldInSim)->default_value(1.), "Correct for different number of layers in fibre mats in sim and testbeam")
     ("debug,2", po::bool_switch(&c.debug), "debug output")
     ;
 
@@ -111,7 +113,7 @@ int main(int argc, char *argv[]){
   std::vector<std::vector<Channel>*>* data;
 
   if(c.simulation){
-    data = parseCorrectedRootTree(inputTree, 1, 4, 128);
+    data = parseCorrectedRootTree(inputTree, 1, 4, 12, true);
   }
   else{
     data = parseCorrectedRootTree(inputTree, 3, 4, 128);
