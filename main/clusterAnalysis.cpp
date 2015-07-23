@@ -59,6 +59,7 @@ std::pair<double , double> getMean(std::vector<double> data){
   return std::make_pair(mean, stdDev);
 }
 
+
 int parseOptions(config &c, int argc, char *argv[]){
 
   // declare options
@@ -118,16 +119,11 @@ int main(int argc, char *argv[]){
 
 
   ClusterCreator clCreator;
-
-
   for (const auto& event : *data){
 
     if(c.clusterAlg == "b") clCreator.FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
     if(c.clusterAlg == "m") clCreator.FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
                                                   //neighbor, seed, sum, maxsize simu 3, 5, 8
-
-
-
   }
 
   std::cout << "Found " << clCreator.getNumberOfClusters() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";

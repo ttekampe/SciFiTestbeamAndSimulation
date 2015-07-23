@@ -80,3 +80,23 @@ set(ALL_LIBRARIES ${ROOT_LIBRARIES} ${ROOFIT_LIBRARIES} ${ADDITIONAL_LIBRARIES} 
 
 add_subdirectory(src)
 add_subdirectory(main)
+
+#MACRO(SUBDIRLIST result curdir)
+#  FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
+#  SET(dirlist "")
+#  FOREACH(child ${children})
+#    IF(IS_DIRECTORY ${curdir}/${child})
+#        LIST(APPEND dirlist ${child})
+#    ENDIF()
+#  ENDFOREACH()
+#  SET(${result} ${dirlist})
+#ENDMACRO()
+#
+#SUBDIRLIST(SUBDIRS ${MY_CURRENT_DIR})
+#
+#file(WRITE .clang_complete "")
+#
+#FOREACH(subdir ${SUBDIRS})
+#    file(APPEND .clang_complete "-I"${subdir})
+#    ADD_SUBDIRECTORY(${subdir})
+#ENDFOREACH()
