@@ -40,11 +40,11 @@ TString removePath(TString str){
 }
 
 std::vector<Event*>* parseRootTree(TTree* dataTree,
-                                                  unsigned int uplinkMin,
-                                                  unsigned int uplinkMax,
-                                                  unsigned int nAdcs,
-                                                  const std::map<unsigned int, std::map<unsigned int, double>>& pedestals,
-                                                  const std::map<unsigned int, std::map<unsigned int, double>>& gains){
+                                    unsigned int uplinkMin,
+                                    unsigned int uplinkMax,
+                                    unsigned int nAdcs,
+                                    const std::map<unsigned int, std::map<unsigned int, double>>& pedestals,
+                                    const std::map<unsigned int, std::map<unsigned int, double>>& gains){
 
   std::vector<Event*>* dataVector = new std::vector<Event*>(dataTree->GetEntriesFast());
 

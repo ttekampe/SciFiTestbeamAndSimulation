@@ -116,7 +116,7 @@ int main(int argc, char *argv[]){
     data = parseCorrectedRootTree(inputTree, 1, 4, 12, true);
   }
   else{
-    data = parseCorrectedRootTree(inputTree, 3, 4, 128);
+    data = parseCorrectedRootTree(inputTree, 3, 4, 128, false);
   }
 
 

@@ -34,7 +34,7 @@ std::vector<Event*>* parseRootTree(TTree* dataTree,
 std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
                                             unsigned int uplinkMin,
                                             unsigned int uplinkMax,
-                                            unsigned int nAdcs
+                                            unsigned int nAdcs,
                                             bool correctSim);
 
 
