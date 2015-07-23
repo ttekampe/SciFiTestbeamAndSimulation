@@ -59,6 +59,7 @@ std::pair<double , double> getMean(std::vector<double> data){
   return std::make_pair(mean, stdDev);
 }
 
+
 int parseOptions(config &c, int argc, char *argv[]){
 
   // declare options
