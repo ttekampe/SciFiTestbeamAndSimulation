@@ -1,7 +1,4 @@
-from ROOT import gStyle, TFile, TTree, TH1D, TCanvas, kRed, kOpenCircle, gPad
-import lhcbStyle
-import sys
-import argparse
+import sys, argparse
 
 class plot:
 	name = ""
@@ -14,13 +11,16 @@ class plot:
 		return str((self.upperBoundary-self.lowerBoundary)/float(self.nBins))
 
 
-parser = argparse.ArgumentParser(description='Calculate PID efficiencies based on histograms created by PIDCalib.')
+parser = argparse.ArgumentParser(description='Plot cluster properties from data and simulation.')
 parser.add_argument('-d', '--data', type=str)
 parser.add_argument('-s', '--simulation')
 parser.add_argument("-p", "--position")
 
 cfg = parser.parse_args()
 
+import lhcbStyle
+from ROOT import gStyle, TFile, TTree, TH1D, TCanvas, kRed, kOpenCircle, gPad
+#ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 
 lhcbStyle.setLHCbStyle()
@@ -130,7 +130,7 @@ for p in plots:
 		hist_sim.DrawNormalized("e")
 		gPad.Modified()
 		hist.DrawNormalized("esames")
-	
+
 
 	#hist.Draw("esames")
 	can.SaveAs("clusterPlots_Pos" + cfg.position + ".pdf")
