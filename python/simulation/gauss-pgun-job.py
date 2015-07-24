@@ -4,6 +4,7 @@
 import sys
 import inspect
 import os
+from math import tan
 
 from Gauss.Configuration import *
 #from Gaudi.Configuration import *
@@ -18,7 +19,7 @@ sys.path.append(local_dir)
 from Configurables import LHCbApp, CondDB
 
 
-def execute(pos="c", stereo=5):
+def execute(pos="c", angle=0):
   importOptions("$APPCONFIGOPTS/Gauss/Beam7000GeV-md100-nu7.6-HorExtAngle.py")
 
   importOptions("$LBPYTHIA8ROOT/options/Pythia8.py")
@@ -27,26 +28,10 @@ def execute(pos="c", stereo=5):
   importOptions("$APPCONFIGOPTS/Persistency/Compression-ZLIB-1.py")
   importOptions("$APPCONFIGOPTS/Gauss/Gauss-Upgrade-Baseline-20131029.py")
 
-  outpath = "testbeam_simulation_position_" + pos
+  outpath = "testbeam_simulation_position_" + pos  + '_at_' + str(angle) + 'deg'
 
   Gauss().DataType = "Upgrade"
 
-#  LHCbApp().Simulation = True
-#  CondDB().Upgrade = True
-#  t = {
-#      "DDDB": "dddb-20131025"
-#      ,"CondDB": "sim-20130830-vc-md100"
-##      ,"Others": ["VP_UVP+RICH_2019+UT_UUT"
-##                 ,"FT_StereoAngle%s"%stereo,
-##                 ,"Muon_NoM1", "Calo_NoSPDPRS"
-##                 ]
-#      }
-#  LHCbApp().DDDBtag = t['DDDB']
-#  LHCbApp().CondDBtag = t['CondDB']
-#
-#  if 'Others' in t:
-#    CondDB().AllLocalTagsByDataType = t['Others']
-#
   LHCbApp().DDDBtag = "dddb-20150424"
   LHCbApp().CondDBtag = "sim-20140204-vc-md100"
 
@@ -85,8 +70,8 @@ def execute(pos="c", stereo=5):
   ParticleGun().MaterialEval.ModP = 150000 #150GeV
 
   ParticleGun().MaterialEval.ZPlane = 9439
-  ParticleGun().MaterialEval.Xmin = x_orig - 1.7
-  ParticleGun().MaterialEval.Xmax = x_orig + 1.7
+  ParticleGun().MaterialEval.Xmin = x_orig - 1.7 + 1819. * tan(angle)
+  ParticleGun().MaterialEval.Xmax = x_orig + 1.7 + 1819. * tan(angle)
   ParticleGun().MaterialEval.Ymin = y_orig - 1.7
   ParticleGun().MaterialEval.Ymax = y_orig + 1.7
   ParticleGun().MaterialEval.PdgCode = 211
