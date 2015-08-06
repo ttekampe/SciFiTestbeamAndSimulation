@@ -125,7 +125,7 @@ int main(int argc, char *argv[]){
 
     if(c.clusterAlg == "b") clCreator.FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
     if(c.clusterAlg == "m") clCreator.FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
-    if curentNumberOfClusters == clCreator.getNumberOfClusters()) ++missedEvents;
+    if (curentNumberOfClusters == clCreator.getNumberOfClusters()) ++missedEvents;
     currentNumberOfClusters = clCreator.getNumberOfClusters();
                                                   //neighbor, seed, sum, maxsize, debug in simu 3, 5, 8
   }
