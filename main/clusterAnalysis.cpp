@@ -119,14 +119,19 @@ int main(int argc, char *argv[]){
 
 
   ClusterCreator clCreator;
+  int currentNumberOfClusters{0};
+  int missedEvents{0};
   for (const auto& event : *data){
 
     if(c.clusterAlg == "b") clCreator.FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
     if(c.clusterAlg == "m") clCreator.FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
+    if curentNumberOfClusters == clCreator.getNumberOfClusters()) ++missedEvents;
+    currentNumberOfClusters = clCreator.getNumberOfClusters();
                                                   //neighbor, seed, sum, maxsize, debug in simu 3, 5, 8
   }
 
   std::cout << "Found " << clCreator.getNumberOfClusters() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
+  std::cout << "Missed " << missedEvents << " events\n";
   std::string tag = "";
   if (c.clusterAlg == "m") tag = "_max";
 
