@@ -123,7 +123,7 @@ det = appMgr.detsvc()
 
 resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole"
 
-fileName = sys.argv[1].split("/")[-1][:".sim"] + ".root"
+fileName = sys.argv[1].split("/")[-1].replace(".sim", ".root")
 
 print("Outputfile: " + fileName)
 
