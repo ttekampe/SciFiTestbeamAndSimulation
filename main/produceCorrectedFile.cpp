@@ -112,7 +112,7 @@ int main(int argc, char *argv[]){
   }
 
 
-  TString newFileName = "/data/testbeam/data/corrected" + c.file2correct;
+  TString newFileName = "/data/testbeam/data/corrected/" + removePath(c.file2correct);
   newFileName.ReplaceAll(".root", "_corrected.root");
 
 

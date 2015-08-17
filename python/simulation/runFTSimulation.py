@@ -121,10 +121,16 @@ det = appMgr.detsvc()
 #sipm chanel 0 - 127
 
 
-resultPath = "/net/storage03/data/users/ttekampe/SciFi/testbeamSimu/PosA/"
+resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole"
 
+fileName = sys.argv[1].split("/")[-1][:".sim"] + ".root"
 
-outputFile = R.TFile(resultPath + "simulationResponse_fibMatVolCor_newTags_PosA.root", "RECREATE")
+print("Outputfile: " + fileName)
+
+exit()
+
+#outputFile = R.TFile(resultPath + "simulationResponse_fibMatVolCor_newTags_PosA.root", "RECREATE")
+outputFile = R.TFile(resultPath + fileName, "RECREATE")
 #IOHelper('ROOT').outputFiles(resultPath + "simulationResponse.root")
 nLayer = 12
 sipmIDs = [1, 2, 3, 4]

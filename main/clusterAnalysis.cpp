@@ -132,6 +132,7 @@ int main(int argc, char *argv[]){
 
   std::cout << "Found " << clCreator.getNumberOfClusters() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
   std::cout << "Missed " << missedEvents << " events\n";
+  std::cout << "Rate of MCEvent producing one or more clusters: " << 1. - (double)missedEvents/data->size() << "\n";
   std::string tag = "";
   if (c.clusterAlg == "m") tag = "_max";
 
