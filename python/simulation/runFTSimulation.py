@@ -127,8 +127,6 @@ fileName = sys.argv[1].split("/")[-1].replace(".sim", ".root")
 
 print("Outputfile: " + fileName)
 
-exit()
-
 #outputFile = R.TFile(resultPath + "simulationResponse_fibMatVolCor_newTags_PosA.root", "RECREATE")
 outputFile = R.TFile(resultPath + fileName, "RECREATE")
 #IOHelper('ROOT').outputFiles(resultPath + "simulationResponse.root")
