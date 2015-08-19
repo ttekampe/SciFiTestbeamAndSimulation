@@ -4,7 +4,7 @@
 import sys
 import inspect
 import os
-from math import tan
+from math import tan, radians
 
 from Gauss.Configuration import *
 #from Gaudi.Configuration import *
@@ -17,6 +17,8 @@ sys.path.append(local_dir)
 #from common import set_tags
 
 from Configurables import LHCbApp, CondDB
+
+
 
 
 def execute(pos="c", angle=0):
@@ -55,6 +57,8 @@ def execute(pos="c", angle=0):
 
 
   moduleWidth = 552.4 + 3 # 3 = modul gap
+  z_orig = 7834. # 7620
+  z_target = 9439.
   x_orig = 4. * moduleWidth + 65.3 # centre of the innermost fibre mat of the second module from left when looking into beam direction (neglected half a gap)
   #y_orig = 2417.5
   if pos == "a":
@@ -66,12 +70,13 @@ def execute(pos="c", angle=0):
 
   ParticleGun().MaterialEval.Xorig = x_orig
   ParticleGun().MaterialEval.Yorig = y_orig
-  ParticleGun().MaterialEval.Zorig = 7620
+  #ParticleGun().MaterialEval.Zorig = 7620
+  ParticleGun().MaterialEval.Zorig = z_orig
   ParticleGun().MaterialEval.ModP = 150000 #150GeV
 
-  ParticleGun().MaterialEval.ZPlane = 9439
-  ParticleGun().MaterialEval.Xmin = x_orig - 1.7 + 1819. * tan(angle)
-  ParticleGun().MaterialEval.Xmax = x_orig + 1.7 + 1819. * tan(angle)
+  ParticleGun().MaterialEval.ZPlane = z_target
+  ParticleGun().MaterialEval.Xmin = x_orig - 1.7 + (z_target - z_orig) / tan( radians(90 - angle) )
+  ParticleGun().MaterialEval.Xmax = x_orig + 1.7 + (z_target - z_orig) / tan( radians(90 - angle) )
   ParticleGun().MaterialEval.Ymin = y_orig - 1.7
   ParticleGun().MaterialEval.Ymax = y_orig + 1.7
   ParticleGun().MaterialEval.PdgCode = 211

@@ -24,19 +24,21 @@ j = Job(application=Gauss(
 j.name = "SciFi-Pos" + pos + "_angle_" + str(angle)
 j.outputfiles = [LocalFile("*.sim")]
 
-j.backend=Dirac()
+j.backend=Local()
 #j.backend.settings['BannedSites'] = ['LCG.RRCKI.ru']
 
 
-events = 10000
-eventsperjob = 500
+#events = 10000
+#eventsperjob = 500
 
+events = 10000
+eventsperjob = 250
 
 j.splitter = GaussSplitter(numberOfJobs=int(round(events*1.00000001/eventsperjob)),
                            eventsPerJob=eventsperjob)
 
 
-j.postprocessors.append(LHCbFileMerger(files = ['testbeam_simulation_position_' + pos + '_at_' + str(angle) + 'deg.sim','stdout'],ignorefailed=True,overwrite=True))
+j.postprocessors.append(LHCbFileMerger(files = ['testbeam_simulation_position_' + pos + '_at_' + str(angle) + 'deg.sim'],ignorefailed=True,overwrite=True))
 
 
 j.prepare()
