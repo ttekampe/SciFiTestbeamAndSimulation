@@ -1,3 +1,11 @@
+import argparse
+
+parser = argparse.ArgumentParser(description='Plot cluster properties from data and simulation.')
+parser.add_argument('-f', '--file', type=str)
+parser.add_argument('-t', '--tag', type=str, default="")
+
+cfg = parser.parse_args()
+
 import GaudiPython as GP
 from GaudiConf import IOHelper
 from Configurables import LHCbApp, ApplicationMgr, DataOnDemandSvc
@@ -11,12 +19,15 @@ from LinkerInstances.eventassoc import *
 import ROOT as R
 
 
+#from Configurables import Boole
+#Boole().DataType = 'Upgrade'
+#Boole().DatasetName = (cfg.file.split("/")[-1]).replace(".sim", cfg.tag)
+
 def resetSipmVals(sipimValPtr):
   for layer in sipimValPtr:
     for adcID in layer:
       for adcChan in layer[adcID]:
         adcChan[0] = 0
-
 
 LHCbApp().Simulation = True
 CondDB().Upgrade = True
@@ -39,7 +50,7 @@ appConf.ExtSvc+= [
 appConf.TopAlg += [
                    "MCFTDepositCreator"
                    ,"MCFTDigitCreator"
-                   ,"FTClusterCreator"
+                   #,"FTClusterCreator"
                    #,"FTNtupleMaker"
                    ]
 
@@ -47,17 +58,28 @@ appConf.TopAlg += [
 from Configurables import SiPMResponse
 SiPMResponse().useNewResponse = 2
 
-from Configurables import MCFTDepositCreator
-MCFTDepositCreator().SpillVector = ["/"]
-MCFTDepositCreator().SpillTimes = [0.0]
-#MCFTDepositCreator().AttenuationToolName = "Julians nice tool"
 
 from Configurables import MCFTDigitCreator
-#MCFTDigitCreator().Irradiation = 0.0 #disables thermal noise
 MCFTDigitCreator().Force2bitADC = 0
 
-#could set
-#MCFTDigitCreator().SiPMGain
+from Configurables import MCFTAttenuationTool
+att = MCFTAttenuationTool()
+att.ShortAttenuationLength = 491.7 # 200mm
+att.LongAttenuationLength = 3526. # 4700mm
+att.FractionShort = 0.234 # 0.18
+
+#make sure I always hit uirradiated zone
+att.XMaxIrradiatedZone = 999999999999.#2000
+att.YMaxIrradiatedZone = -1.#500
+
+from Configurables import MCFTDepositCreator
+MCFTDepositCreator().addTool(att)
+MCFTDepositCreator().SpillVector = ["/"]
+MCFTDepositCreator().SpillTimes = [0.0]
+MCFTDepositCreator().UseAttenuation = True
+#MCFTDepositCreator().AttenuationToolName = "Julians nice tool"
+
+
 
 tof = 25.4175840541
 
@@ -84,10 +106,8 @@ MCFTDigitCreator().PhotoElectronsPerMeV = 120. * f_5l
 ### jacos config for craeting nTuple
 #from Configurables import GaudiSequencer, FTNtupleMaker, NTupleSvc
 #NTupleSvc().Output = ["FILE1 DATAFILE='mytupleFile.root' TYP='ROOT' OPT='NEW'"]
-
 #GaudiSequencer("MoniFTSeq").Members += [FTNtupleMaker()]
-
-#### end
+### end
 
 s = SimConf()
 SimConf().Detectors = ['VP', 'UT', 'FT', 'Rich1Pmt', 'Rich2Pmt', 'Ecal', 'Hcal', 'Muon']
@@ -105,16 +125,17 @@ dre.DataOnDemand = True
 lhcbApp = LHCbApp()
 lhcbApp.Simulation = True
 
-
-import sys
-inputFiles = [sys.argv[-1]]
-IOHelper('ROOT').inputFiles(inputFiles)
-
+IOHelper('ROOT').inputFiles([cfg.file])
 
 # Configuration done, run time!
 appMgr = GP.AppMgr()
 evt = appMgr.evtsvc()
 det = appMgr.detsvc()
+hist = appMgr.histSvc()
+
+hist.dump()
+
+#exit()
 
 #quarter 0 - 3
 #sipm id 0 - 15
@@ -123,7 +144,7 @@ det = appMgr.detsvc()
 
 resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/"
 
-fileName = sys.argv[1].split("/")[-1].replace(".sim", ".root")
+fileName = (cfg.file.split("/")[-1]).replace(".sim", cfg.tag + ".root")
 
 print("Outputfile: " + fileName)
 
@@ -169,3 +190,8 @@ outputFile.cd()
 for t in outputTrees:
   t.Write()
 outputFile.Close()
+
+#h1 = hist['/stat/MCFTDepositCreator.MCFTAttenuationTool/FinalAttenuationMap']
+#c = R.TCanvas()
+#h1.Draw("e")
+#c.SaveAs("finAttMap.pdf")
