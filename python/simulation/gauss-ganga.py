@@ -5,7 +5,7 @@ import os
 
 
 # angle between beam and fibre mat in x
-angle = 30 #int(sys.argv[1])
+angle = 20 #int(sys.argv[1])
 
 local_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 
@@ -32,7 +32,7 @@ j.backend=Local()
 #eventsperjob = 500
 
 events = 10000
-eventsperjob = 250
+eventsperjob = 2000
 
 j.splitter = GaussSplitter(numberOfJobs=int(round(events*1.00000001/eventsperjob)),
                            eventsPerJob=eventsperjob)
