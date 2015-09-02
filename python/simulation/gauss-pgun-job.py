@@ -65,6 +65,8 @@ def execute(pos="c", angle=0):
     y_orig = 50 # 5 cm from mirror
   elif pos == "c":
     y_orig = 2417.5 - 50. # 5 cm from SiPM
+  elif pos.isdigit():
+    y_orig = float(pos)
   else:
     exit()
 

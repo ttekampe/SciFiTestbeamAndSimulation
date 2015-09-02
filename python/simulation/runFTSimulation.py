@@ -85,7 +85,7 @@ tof = 25.4175840541
 
 
 MCFTDigitCreator().IntegrationOffset = [26 - tof, 28 - tof, 30 - tof]
-MCFTDigitCreator().SimulateNoise = False
+MCFTDigitCreator().SimulateNoise = True
 #MCFTDigitCreator().Temperature =
 MCFTDigitCreator().Irradiation = 0.0
 MCFTDigitCreator().SiPMGain = sipm_gain = 1000.
@@ -142,7 +142,7 @@ hist.dump()
 #sipm chanel 0 - 127
 
 
-resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/"
+resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/attScanWithNoise/"
 
 fileName = (cfg.file.split("/")[-1]).replace(".sim", cfg.tag + ".root")
 
