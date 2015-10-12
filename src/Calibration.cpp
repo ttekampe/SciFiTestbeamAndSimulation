@@ -90,7 +90,8 @@ std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
                                             unsigned int uplinkMin,
                                             unsigned int uplinkMax,
                                             unsigned int nAdcs,
-                                            bool correctSim
+                                            bool correctSim,
+                                            double factor
                                           ){
 
   std::vector<Event*>* dataVector = new std::vector<Event*>(dataTree->GetEntriesFast());
@@ -121,9 +122,11 @@ std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
           Channel c;
           c.Uplink = uplink;
           c.ChannelNumber = adc+1;
-          if(adcVals[uplink-uplinkMin][adc]>0)
+          if(adcVals[uplink-uplinkMin][adc]>0){
             if (correctSim) c.AdcValue = adcVals[uplink-uplinkMin][adc] * 6./5.;
             else c.AdcValue = adcVals[uplink-uplinkMin][adc];
+            c.AdcValue *= factor;
+          }
           else
             c.AdcValue = 0;
           //if(adcVals[uplink-uplinkMin][adc]>10 || adcVals[uplink-uplinkMin][adc] <-10){

@@ -5,6 +5,7 @@ include_directories(${SciFiTestbeamAndSimulation_SOURCE_DIR}/include)
 add_executable(gains gains.cpp)
 add_executable(produceCorrectedFile produceCorrectedFile.cpp)
 add_executable(clusterAnalysis clusterAnalysis.cpp)
+add_executable(attScan attScan.cpp)
 
 
 # Linker information
@@ -12,3 +13,4 @@ add_executable(clusterAnalysis clusterAnalysis.cpp)
 target_link_libraries(gains Calibration LHCbStyle ${Boost_LIBRARIES})
 target_link_libraries(produceCorrectedFile ${Boost_LIBRARIES} Calibration)
 target_link_libraries(clusterAnalysis ${Boost_LIBRARIES} Calibration ClusterCreator ClusterMonitor Cluster)
+target_link_libraries(attScan Calibration ClusterCreator Cluster LHCbStyle)
