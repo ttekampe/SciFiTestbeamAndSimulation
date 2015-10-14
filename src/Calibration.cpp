@@ -170,7 +170,7 @@ void produceGains(TTree* t,
   canvasName.ReplaceAll(".txt", ".pdf");
 
   TCanvas can("", "");
-  can.SaveAs( (canvasName + "[").Data() );
+  can.SaveAs( (savePath + canvasName + "[").Data() );
 
   double numFits{0.};
   double failedFits{0.};
@@ -270,7 +270,7 @@ void produceGains(TTree* t,
       dataSet.plotOn(myFrame);
       pdf.plotOn(myFrame);
       myFrame->Draw();
-      can.SaveAs( (canvasName).Data() );
+      can.SaveAs( (savePath + canvasName).Data());
 
       for(unsigned int i=0; i<nGaussians; ++i){
         delete means[i];
@@ -281,7 +281,7 @@ void produceGains(TTree* t,
       }
     }
   }
-  can.SaveAs( (canvasName + "]").Data() );
+  can.SaveAs( (savePath + canvasName + "]").Data() );
 
   std::cout << failedFits/numFits*100. << "% of all fits failed." << std::endl;
 }

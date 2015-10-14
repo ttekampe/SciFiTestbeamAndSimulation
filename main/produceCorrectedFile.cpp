@@ -16,19 +16,14 @@
 
 namespace po = boost::program_options;
 
-
-
-
-
 struct config{
   std::string file2correct;
   std::string ledFileName;
   std::string darkFileName;
+  unsigned int uplinkMin;
+  unsigned int uplinkMax;
   bool debug;
 };
-
-
-
 
 int parseOptions(config &c, int argc, char *argv[]){
 
@@ -37,6 +32,8 @@ int parseOptions(config &c, int argc, char *argv[]){
   desc.add_options()
     ("help", "show this help")
     ("file2correct,f", po::value<std::string>(&c.file2correct), "test beam data file containing the led run")
+    ("umax,u", po::value<unsigned int>(&c.uplinkMax)->default_value(4), "uplink number to start at [1, ... , 8]")
+    ("umin,l", po::value<unsigned int>(&c.uplinkMin)->default_value(3), "uplink number to stop at [1, ... , 8]")
     ;
 
   // actually do the parsing
@@ -60,6 +57,12 @@ int main(int argc, char *argv[]){
     std::cerr << "Can not parse options!" << std::endl;
     return 0;
   }
+
+  if(c.uplinkMax<c.uplinkMin){
+      std::cerr << "error in configuration: uplink min is bigger that uplink max\n";
+      return  0;
+  }
+
   const unsigned int runNumber = runNumberFromFilename(c.file2correct);
   calibrationRunNumbers calNum = lookUpCalibrationFiles(runNumber, "/data/testbeam/data/runNumbers.txt");
 
@@ -82,7 +85,6 @@ int main(int argc, char *argv[]){
     return 0;
   }
 
-
   TString gainFileName = c.ledFileName;
   gainFileName = removePath(gainFileName);
   gainFileName.ReplaceAll(".root", "_gain.txt");
@@ -93,7 +95,7 @@ int main(int argc, char *argv[]){
   std::ifstream gainFile(gainFileName);
   if(!gainFile){
     std::cout << "could not find gainfile -> producing gains" << std::endl;
-    produceGains(ledTree, 3, 4, 1, 128, 4, c.ledFileName, "/home/tobi/SciFi/results/gains/");
+    produceGains(ledTree, c.uplinkMin, c.uplinkMax, 1, 128, 4, c.ledFileName, "/home/tobi/SciFi/results/gains/");
   }
   else std::cout << "found gain file." << std::endl;
   gainFile.close();
@@ -103,9 +105,9 @@ int main(int argc, char *argv[]){
 
 
   std::cout << "reading pedestals" << std::endl;
-  std::map<unsigned int, std::map<unsigned int, double> > pedestals = getPedestals(c.darkFileName, 3, 4, 128);
+  std::map<unsigned int, std::map<unsigned int, double> > pedestals = getPedestals(c.darkFileName, c.uplinkMin, c.uplinkMax, 128);
 
-  for(unsigned int i=3; i<=4; ++i){
+  for(unsigned int i=c.uplinkMin; i<=c.uplinkMax; ++i){
     for(unsigned int j = 1; j<=128; ++j){
       std::cout << "uplink: " << i << "\tadc: " << j << "\t pesdestal: " << pedestals[i][j]<< "\t gain: " << gains[i][j] << std::endl;
     }
@@ -121,7 +123,7 @@ int main(int argc, char *argv[]){
 
 
   std::cout << "correcting file" << std::endl;
-  correctFile(dataTree, gains, pedestals, 3, 4, 128, newFileName);
+  correctFile(dataTree, gains, pedestals, c.uplinkMin, c.uplinkMax, 128, newFileName);
 
   return 0;
 }
