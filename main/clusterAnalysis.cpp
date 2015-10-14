@@ -2,6 +2,7 @@
 #include <vector>
 #include <cmath>
 #include <iostream>
+#include <map>
 
 //from ROOT
 #include "TFile.h"
@@ -123,44 +124,96 @@ int main(int argc, char *argv[]){
       return 0;
     }
 
-    std::vector<std::vector<Channel>*>* data;
+    /*
+    In the 2015 testbeam 4 fibre mats were tested:
+    HD2 Uplink 5 and 6
+    HD1 Uplink 7 and 8
+    CERN4 Uplink 1 and 2
+    SLAYER3(DUT) Uplink 3 and 4
+    */
+
+    std::map<std::string, std::vector<std::vector<Channel>*>* > data;
 
     if(c.simulation){
-      data = parseCorrectedRootTree(inputTree, 1, 4, 128, true);
+      data["simulation"] = parseCorrectedRootTree(inputTree, 1, 4, 128, true);
     }
     else{
-      data = parseCorrectedRootTree(inputTree, 3, 4, 128, false);
+      data["cern"] = parseCorrectedRootTree(inputTree, 1, 2, 128, false);
+      data["slayer"] = parseCorrectedRootTree(inputTree, 3, 4, 128, false);
+      data["HD2"] = parseCorrectedRootTree(inputTree, 5, 6, 128, false);
+      data["HD1"] = parseCorrectedRootTree(inputTree, 7, 8, 128, false);
     }
 
+    std::map<std::string, ClusterCreator> clCreators;
+    if(!c.simulation){
+      clCreators["cern"] = ClusterCreator();
+      clCreators["slayer"] = ClusterCreator();
+      clCreators["HD2"] = ClusterCreator();
+      clCreators["HD1"] = ClusterCreator();
+    }
 
-    ClusterCreator clCreator;
+    clCreators["simulation"] = ClusterCreator(); // in the case of data this one stores the mathed clusters
+
+    std::map<std::string, bool> clusterInModule;
+    clusterInModule["cern"] = false;
+    clusterInModule["slayer"] = false;
+    clusterInModule["HD2"] = false;
+    clusterInModule["HD1"] = false;
+
+    ClusterCreator cl2Analyse;
     int currentNumberOfClusters{0};
-    int missedEvents{0};
-    for (const auto& event : *data){
+    double missedEvents{0};
+    double foundEvents{0};
+    if(c.simulation){
+        for (const auto& event : *data["simulation"]){
 
-      if(c.clusterAlg == "b") clCreator.FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
-      if(c.clusterAlg == "m") clCreator.FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
-      if (currentNumberOfClusters == clCreator.getNumberOfClusters()) ++missedEvents;
-      currentNumberOfClusters = clCreator.getNumberOfClusters();
-                                                    //neighbor, seed, sum, maxsize, debug in simu 3, 5, 8
+          if(c.clusterAlg == "b") clCreators["simulation"].FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
+          if(c.clusterAlg == "m") clCreators["simulation"].FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
+          if (currentNumberOfClusters == clCreators["simulation"].getNumberOfClusters()) ++missedEvents;
+          currentNumberOfClusters = clCreators["simulation"].getNumberOfClusters();
+                                                        //neighbor, seed, sum, maxsize, debug in simu 3, 5, 8
+        }
+    }
+    else{
+        for(unsigned int i = 0; i<inputTree->GetEntriesFast(); ++i){
+            clusterInModule["cern"] = clCreators["cern"].FindClustersInEventBoole(*(data["cern"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+            clusterInModule["slayer"] = clCreators["slayer"].FindClustersInEventBoole(*(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+            clusterInModule["HD2"] = clCreators["HD2"].FindClustersInEventBoole(*(data["HD2"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+            clusterInModule["HD1"] = clCreators["HD1"].FindClustersInEventBoole(*(data["HD1"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+
+            if(clusterInModule["cern"] && clusterInModule["HD2"] && clusterInModule["HD1"]) ++missedEvents;
+
+            if(clusterInModule["cern"] && clusterInModule["slayer"] && clusterInModule["HD2"] && clusterInModule["HD1"]){ // if cluster in all modules store the slayer one for analysis
+                clCreators["simulation"].FindClustersInEventBoole((*data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+                ++foundEvents;
+            }
+
+        }
     }
 
-    std::cout << "Found " << clCreator.getNumberOfClusters() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
-    std::cout << "Missed " << missedEvents << " events\n";
-    double event2OneOrMoreClusterEff = 1. - (double)missedEvents/data->size();
-    std::cout << "Rate of MCEvent producing one or more clusters: " << event2OneOrMoreClusterEff << " +/- " << TMath::Sqrt( (1-event2OneOrMoreClusterEff)*event2OneOrMoreClusterEff/(double)data->size() )  << "\n";
-
+    if(c.simulation){
+        std::cout << "Found " << clCreators["simulation"].getNumberOfClusters() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
+        std::cout << "Missed " << missedEvents << " events\n";
+        double event2OneOrMoreClusterEff = 1. - (double)missedEvents/data["simulation"]->size();
+        std::cout << "Rate of MCEvent producing one or more clusters: " << event2OneOrMoreClusterEff << " +/- "
+                  << TMath::Sqrt( (1-event2OneOrMoreClusterEff)*event2OneOrMoreClusterEff/(double)data["simulation"]->size() )  << "\n";
+    }
+    else{
+      std::cout << "Found " << missedEvents << " events that caused one or more cluster in all three but the slayer modules.\n";
+      std::cout << "Found " << foundEvents << " events that caused one or more clusters in all modules\n";
+      std::cout << "This is the fraction of " << foundEvents / missedEvents << "\n";
+    }
     double meanLightYield{0};
-    for(const auto& cl : clCreator.getClusters()){
+    for(const auto& cl : clCreators["simulation"].getClusters()){
       meanLightYield += cl->GetSumOfAdcValues();
     }
-    meanLightYield /= (double)clCreator.getNumberOfClusters();
+    meanLightYield /= (double)clCreators["simulation"].getNumberOfClusters();
 
     double stdDevLightYield{0};
-    for(const auto& cl : clCreator.getClusters()){
+    for(const auto& cl : clCreators["simulation"].getClusters()){
       stdDevLightYield += (cl->GetSumOfAdcValues() - meanLightYield) * (cl->GetSumOfAdcValues() - meanLightYield);
     }
-    stdDevLightYield *= 1./((double)clCreator.getNumberOfClusters() - 1.);
+    stdDevLightYield *= 1./((double)clCreators["simulation"].getNumberOfClusters() - 1.);
     stdDevLightYield = TMath::Sqrt(stdDevLightYield);
 
     std::cout << "Mean light yield: " << meanLightYield << " +/- " << stdDevLightYield << "\n";
@@ -169,66 +222,8 @@ int main(int argc, char *argv[]){
     if (c.clusterAlg == "m") c.tag += "_max";
 
     ClusterMonitor clMonitor;
-    clMonitor.WriteToNtuple(clCreator, ("/home/tobi/SciFi/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data() );
+    clMonitor.WriteToNtuple(clCreators["simulation"], ("/home/tobi/SciFi/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data() );
 
-
-  //  std::vector<Cluster*> clusterVec;
-  //
-  //  for (const auto& event : *data){
-  //                                                  //neighbor, seed, sum, maxsize simu 3, 5, 8
-  //    FindClustersInEventBoole(clusterVec, *event, 1.5, 2.5, 4.5, 100, false);
-  ////    FindClustersInEventFTStyle(clusterVec, *event, 0.5, 1.5, 1.5, 100, false);
-  //
-  //
-  //  }
-  //
-  //  std::cout << "Found " << clusterVec.size() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
-  //
-  //  TFile results("/home/tobi/SciFi/results/clusters/" + removePath(c.file2analyse).ReplaceAll(".root", "_clusterAnalyis.root"), "RECREATE");
-  //  TTree* resultTree = new TTree("clusterAnalysis", "");
-  //
-  //  double d_chargeWeightedMean = 0.0;
-  //  resultTree->Branch("chargeWeightedMean", &d_chargeWeightedMean, "chargeWeightedMean/D");
-  //
-  //  double d_hitWeightedMean = 0.0;
-  //  resultTree->Branch("hitWeightedMean", &d_hitWeightedMean, "hitWeightedMean/D");
-  //
-  //  double d_sumCharge = 0.0;
-  //  resultTree->Branch("sumCharge", &d_sumCharge, "sumCharge/D");
-  //
-  //  double d_maxCharge = 0.0;
-  //  resultTree->Branch("maxCharge", &d_maxCharge, "maxCharge/D");
-  //
-  //  int i_clusterSize = 0;
-  //  resultTree->Branch("clusterSize", &i_clusterSize, "clusterSize/I");
-  //
-  ////  double d_clusterShape = 0.0;
-  ////  resultTree->Branch("clusterShape", &d_clusterShape, "clusterShape/D");
-  //  TH1D clusterShape("clusterShape", "", 10, 0, 10);
-  //
-  //  std::vector<std::vector<double> > adcValuesRelativeToSeed(10);
-  //
-  //
-  //  for(const auto& clust : clusterVec){
-  //    addClusterShapeToHist(*clust, adcValuesRelativeToSeed);
-  //    d_chargeWeightedMean = clust->GetChargeWeightedMean();
-  //    d_hitWeightedMean = clust->GetHitWeightedMean();
-  //    d_sumCharge = clust->GetSumOfAdcValues();
-  //    d_maxCharge = clust->GetMaximumAdcValue();
-  //    i_clusterSize = clust->GetClusterSize();
-  //    resultTree->Fill();
-  //  }
-  //  std::cout << "Filling cluster shape histogram..\n";
-  //  std::pair<double, double> current(0., 0.);
-  //  for(unsigned int i = 0; i<adcValuesRelativeToSeed.size(); ++i){
-  //    current = getMean(adcValuesRelativeToSeed.at(i));
-  //    clusterShape.SetBinContent(i+1, current.first);
-  //    clusterShape.SetBinError(i+1, current.second);
-  //  }
-  //
-  //  clusterShape.Write();
-  //  resultTree->Write();
-  //  results.Close();
   }
 
   return 0;

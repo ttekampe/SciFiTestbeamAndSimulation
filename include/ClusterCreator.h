@@ -17,14 +17,14 @@ private:
 public:
   ClusterCreator(){};
   ~ClusterCreator();
-  void FindClustersInEventMax(
+  bool FindClustersInEventMax(
     const Event& dataVector
     ,const double neighbour_threshold
     ,const double seed_threshold
     ,const double sum_threshold
     );
 
-  void FindClustersInEventBoole(
+  bool FindClustersInEventBoole(
     const Event& event
     ,const double neighbourThreshold
     ,const double seedThreshold
