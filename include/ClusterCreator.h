@@ -17,14 +17,15 @@ private:
 public:
   ClusterCreator(){};
   ~ClusterCreator();
-  bool FindClustersInEventMax(
+
+  std::vector<Cluster*>FindClustersInEventMax(
     const Event& dataVector
     ,const double neighbour_threshold
     ,const double seed_threshold
     ,const double sum_threshold
     );
 
-  bool FindClustersInEventBoole(
+  std::vector<Cluster*>FindClustersInEventBoole(
     const Event& event
     ,const double neighbourThreshold
     ,const double seedThreshold
@@ -33,7 +34,7 @@ public:
     ,bool debug
     );
 
-  int getNumberOfClusters() {return clusters.size();}
+  std::size_t getNumberOfClusters() const {return clusters.size();}
   const std::vector<Cluster*> &getClusters() const {return clusters;}
 
 };

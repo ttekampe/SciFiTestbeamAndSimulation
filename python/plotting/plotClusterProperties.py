@@ -79,10 +79,12 @@ def doPlots(f, f_sim, name):
 	for p in plots:
 		hist = TH1D(p.name, p.name, p.nBins, p.lowerBoundary, p.upperBoundary)
 		hist_sim = TH1D(p.name + "_sim", p.name + "_sim", p.nBins, p.lowerBoundary, p.upperBoundary)
-		if p.name=="sumCharge":
-			reweightHist(hist_sim, 1.2)
+		#if p.name=="sumCharge":
+		#	reweightHist(hist_sim, 1.2)
 
-		t.Draw(p.name + ">>" + p.name)
+		#distance_from_track = 0 +/- 400
+
+		t.Draw(p.name + ">>" + p.name, "distance_from_track<300&&distance_from_track>-300", "")
 		t_sim.Draw(p.name + ">>" + p.name + "_sim")
 
 
@@ -198,15 +200,16 @@ def doPlots(f, f_sim, name):
 lhcbStyle.setLHCbStyle()
 gStyle.SetOptStat(1)
 
-measurements = [["1431786652", "a_at_0deg", "pos_a_0_deg"]
-		,["1432091294", "a_at_10deg", "pos_a_10_deg"]
-		,["1432264510", "a_at_20deg", "pos_a_20_deg"]
-		,["1432350729", "a_at_30deg", "pos_a_30_deg"]
-		,["1432169457", "c_at_0deg", "pos_c_0_deg"]
-		,["1432089102", "c_at_10deg", "pos_c_10_deg"]
-		,["1432187205", "c_at_20deg", "pos_c_20_deg"]
-		,["1432358809", "c_at_30deg", "pos_c_30_deg"]
-		]
+#measurements = [
+#		 ["1431786652", "a_at_0deg", "pos_a_0_deg"]
+#		,["1432091294", "a_at_10deg", "pos_a_10_deg"]
+#		,["1432264510", "a_at_20deg", "pos_a_20_deg"]
+#		,["1432350729", "a_at_30deg", "pos_a_30_deg"]
+#		,["1432169457", "c_at_0deg", "pos_c_0_deg"]
+#		,["1432089102", "c_at_10deg", "pos_c_10_deg"]
+#		,["1432187205", "c_at_20deg", "pos_c_20_deg"]
+#		,["1432358809", "c_at_30deg", "pos_c_30_deg"]
+#		]
 
 
 #for measurement in measurements:
@@ -225,19 +228,44 @@ measurements = [["1431786652", "a_at_0deg", "pos_a_0_deg"]
 #
 #	doPlots(f, f_sim, measurement[2])
 
-f = TFile("/home/tobi/SciFi/results/clusters/btsoftware_1431786652_datarun_ntuple_corrected_clusterAnalyismatched.root", "READ")
+f = TFile("/home/tobi/SciFi/results/clusters/btsoftware_1432169457_datarun_ntuple_corrected_clusterAnalyis.root", "READ")
 if not f.IsOpen():
 	print("Could not open data file for run number")
 
 t = f.Get("clusterAnalysis")
 
-f_sim = TFile("/home/tobi/SciFi/results/clusters/simulationResponse_fibMatVolCor_newTags_PosA_clusterAnalyis.root", "READ")
+if not t:
+	print("tree not found!")
+
+f_sim = TFile("/home/tobi/SciFi/results/clusters/testbeam_simulation_position_c_at_0degnewLight_clusterAnalyis.root", "READ")
 if not f_sim.IsOpen():
 	print("Could not open sim file for configuration")
 
 t_sim = f_sim.Get("clusterAnalysis")
 
-doPlots(f, f_sim, "_pos_A_0deg_defAtt")
+if not t_sim:
+	print("sim tree not found!")
+
+doPlots(f, f_sim, "clusters_pos_C_0deg_newLight")
+
+
+f = TFile("/home/tobi/SciFi/results/clusters/btsoftware_1431786652_datarun_ntuple_corrected_clusterAnalyis.root", "READ")
+if not f.IsOpen():
+	print("Could not open data file for run number")
+
+t = f.Get("clusterAnalysis")
+if not t:
+	print("tree not found!")
+
+f_sim = TFile("/home/tobi/SciFi/results/clusters/testbeam_simulation_position_a_at_0degnewLight_clusterAnalyis.root", "READ")
+if not f_sim.IsOpen():
+	print("Could not open sim file for configuration")
+
+t_sim = f_sim.Get("clusterAnalysis")
+if not t_sim:
+	print("sim tree not found!")
+
+doPlots(f, f_sim, "clusters_pos_a_0deg_newLight")
 
 
 

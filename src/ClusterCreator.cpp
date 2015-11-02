@@ -14,14 +14,14 @@ ClusterCreator::~ClusterCreator(){
   }
 }
 
-bool ClusterCreator::FindClustersInEventMax(
+std::vector<Cluster*> ClusterCreator::FindClustersInEventMax(
                             const Event& event
                             ,const double neighbour_threshold
                             ,const double seed_threshold
                             ,const double sum_threshold
                             )
 {
-  bool foundCluster = false;
+  std::vector<Cluster*> foundClusters;
   Cluster* currentCluster = nullptr;
 
   for(Event::const_iterator chan = event.begin(); chan != event.end(); ++chan){
@@ -37,23 +37,23 @@ bool ClusterCreator::FindClustersInEventMax(
     if( chan->AdcValue <= neighbour_threshold && currentCluster){
       if(currentCluster->GetMaximumAdcValue() > seed_threshold && currentCluster->GetSumOfAdcValues() > sum_threshold){
            clusters.push_back(currentCluster);
-           foundCluster = true;
+           foundClusters.push_back(currentCluster);
        }
       currentCluster = nullptr;
     }
   }
-  return foundCluster;
+  return foundClusters;
 }
 
 
-bool ClusterCreator::FindClustersInEventBoole(const Event& event,
+std::vector<Cluster*> ClusterCreator::FindClustersInEventBoole(const Event& event,
                               const double neighbourThreshold,
                               const double seedThreshold,
                               const double sumThreshold,
                               const int maxClusterSize,
                               bool debug)
 {
-  bool foundCluster = false;
+  std::vector<Cluster*> foundClusters;
   std::vector<Channel>::const_iterator lastStopDigitIter = event.begin(); // end digit of last cluster, to prevent overlap
 
   // Since Digit Container is sorted wrt channelID, clusters are defined searching for bumps of ADC Count
@@ -205,7 +205,7 @@ bool ClusterCreator::FindClustersInEventBoole(const Event& event,
 
 
           clusters.push_back(currentCluster);
-          foundCluster = true;
+          foundClusters.push_back(currentCluster);
 
 
         } // end of Cluster satisfies charge / size requirements
@@ -221,5 +221,5 @@ bool ClusterCreator::FindClustersInEventBoole(const Event& event,
 
     } // END of loop over Digits
 
-    return foundCluster;
+    return foundClusters;
 }

@@ -3,6 +3,9 @@
 #include <cmath>
 #include <iostream>
 #include <map>
+#include <algorithm> 
+#include <fstream>
+
 
 //from ROOT
 #include "TFile.h"
@@ -10,6 +13,17 @@
 #include "TH1D.h"
 #include "TH2I.h"
 #include "TMath.h"
+#include "TGraph.h"
+#include "TF1.h"
+#include "TCanvas.h"
+
+//from RooFit
+#include "RooFit.h"
+#include "RooPlot.h"
+#include "RooRealVar.h"
+#include "RooDataSet.h"
+#include "RooGaussian.h"
+#include "RooFitResult.h"
 
 //from here
 //#include "Cluster.h"
@@ -70,13 +84,13 @@ int parseOptions(config &c, int argc, char *argv[]){
   // declare options
   po::options_description desc("Allowed options") ;
   desc.add_options()
-    ("help", "show this help")
-    ("file,f", po::value<std::vector<std::string>>(&c.files2analyse)->multitoken(), "corrected test beam data file")
-    ("simulation,s", po::bool_switch(&c.simulation), "Simulated input?")
-    ("clusteralg,c", po::value<std::string>(&c.clusterAlg)->default_value("b"), "clustering algorithm: b for Boole or m for Maxs")
-    ("tag,t", po::value<std::string>(&c.tag)->default_value(""), "tag that is added to the output file name")
-    ("debug,d", po::bool_switch(&c.debug), "debug output")
-    ;
+  ("help", "show this help")
+  ("file,f", po::value<std::vector<std::string>>(&c.files2analyse)->multitoken(), "corrected test beam data file")
+  ("simulation,s", po::bool_switch(&c.simulation), "Simulated input?")
+  ("clusteralg,c", po::value<std::string>(&c.clusterAlg)->default_value("b"), "clustering algorithm: b for Boole or m for Maxs")
+  ("tag,t", po::value<std::string>(&c.tag)->default_value(""), "tag that is added to the output file name")
+  ("debug,d", po::bool_switch(&c.debug), "debug output")
+  ;
 
   // actually do the parsing
   po::variables_map vm;
@@ -92,6 +106,8 @@ int parseOptions(config &c, int argc, char *argv[]){
   return 0;
 }
 
+
+
 int main(int argc, char *argv[]){
 
   config c;
@@ -100,7 +116,7 @@ int main(int argc, char *argv[]){
     return 0;
   }
 
-
+  double allModulesHaveOneClusterCnt{0};
   for(const auto& file2analyse : c.files2analyse){
 
     TFile inputFile(file2analyse.c_str(), "READ");
@@ -134,6 +150,32 @@ int main(int argc, char *argv[]){
 
     std::map<std::string, std::vector<std::vector<Channel>*>* > data;
 
+
+    std::vector<double> xPositions;
+    std::string offsetFileName = ( "/home/tobi/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data();
+    bool produceOffsetFile{false};
+    std::vector<double> xOffsets;
+    std::vector<double> track_distances;
+
+    if(!c.simulation){
+      std::cout << "Checking for offsetFile...\n";
+       std::ifstream offsetFile(offsetFileName);
+      if(!offsetFile){
+        std::cout << "Offsetfile does not exists yet -> producing...\n";
+        produceOffsetFile = true;
+      }
+      else{
+        std::string line;
+        std::getline(offsetFile, line);
+        std::istringstream ss(line);
+        double offset;
+        if(ss >> offset) xOffsets.push_back(offset);
+        std::cout << "Found xoffset: " << xOffsets[0] << "\n";
+      }
+    }
+
+    std::vector<double> zPositions = {0., 247.0*1000, 469.0*1000}; // HD2, Slayer, CERN
+
     if(c.simulation){
       data["simulation"] = parseCorrectedRootTree(inputTree, 1, 4, 128, true);
     }
@@ -141,7 +183,7 @@ int main(int argc, char *argv[]){
       data["cern"] = parseCorrectedRootTree(inputTree, 1, 2, 128, false);
       data["slayer"] = parseCorrectedRootTree(inputTree, 3, 4, 128, false);
       data["HD2"] = parseCorrectedRootTree(inputTree, 5, 6, 128, false);
-      data["HD1"] = parseCorrectedRootTree(inputTree, 7, 8, 128, false);
+      //data["HD1"] = parseCorrectedRootTree(inputTree, 7, 8, 128, false);
     }
 
     std::map<std::string, ClusterCreator> clCreators;
@@ -149,54 +191,151 @@ int main(int argc, char *argv[]){
       clCreators["cern"] = ClusterCreator();
       clCreators["slayer"] = ClusterCreator();
       clCreators["HD2"] = ClusterCreator();
-      clCreators["HD1"] = ClusterCreator();
+      //clCreators["HD1"] = ClusterCreator();
     }
 
     clCreators["simulation"] = ClusterCreator(); // in the case of data this one stores the mathed clusters
 
-    std::map<std::string, bool> clusterInModule;
-    clusterInModule["cern"] = false;
-    clusterInModule["slayer"] = false;
-    clusterInModule["HD2"] = false;
-    clusterInModule["HD1"] = false;
+    std::map<std::string, std::vector<Cluster*>> clustersInModule;
+    clustersInModule["cern"];
+    clustersInModule["slayer"];
+    clustersInModule["HD2"];
+    //clustersInModule["HD1"];
 
     ClusterCreator cl2Analyse;
-    int currentNumberOfClusters{0};
+    unsigned int currentNumberOfClusters{0};
     double missedEvents{0};
     double foundEvents{0};
     if(c.simulation){
-        for (const auto& event : *data["simulation"]){
+      for (const auto& event : *data["simulation"]){
 
-          if(c.clusterAlg == "b") clCreators["simulation"].FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
-          if(c.clusterAlg == "m") clCreators["simulation"].FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
-          if (currentNumberOfClusters == clCreators["simulation"].getNumberOfClusters()) ++missedEvents;
-          currentNumberOfClusters = clCreators["simulation"].getNumberOfClusters();
+        if(c.clusterAlg == "b") clCreators["simulation"].FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
+        if(c.clusterAlg == "m") clCreators["simulation"].FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
+        if (currentNumberOfClusters == clCreators["simulation"].getNumberOfClusters()) ++missedEvents;
+        currentNumberOfClusters = clCreators["simulation"].getNumberOfClusters();
                                                         //neighbor, seed, sum, maxsize, debug in simu 3, 5, 8
-        }
+      }
     }
     else{
-        for(unsigned int i = 0; i<inputTree->GetEntriesFast(); ++i){
-            clusterInModule["cern"] = clCreators["cern"].FindClustersInEventBoole(*(data["cern"]->at(i)), 1.5, 2.5, 4.0, 100, false);
-            clusterInModule["slayer"] = clCreators["slayer"].FindClustersInEventBoole(*(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
-            clusterInModule["HD2"] = clCreators["HD2"].FindClustersInEventBoole(*(data["HD2"]->at(i)), 1.5, 2.5, 4.0, 100, false);
-            clusterInModule["HD1"] = clCreators["HD1"].FindClustersInEventBoole(*(data["HD1"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+      for(unsigned int i = 0; i<inputTree->GetEntriesFast(); ++i){
+        clustersInModule["cern"] = clCreators["cern"].FindClustersInEventBoole(*(data["cern"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+        clustersInModule["slayer"] = clCreators["slayer"].FindClustersInEventBoole(*(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+        clustersInModule["HD2"] = clCreators["HD2"].FindClustersInEventBoole(*(data["HD2"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+        //clustersInModule["HD1"] = clCreators["HD1"].FindClustersInEventBoole(*(data["HD1"]->at(i)), 1.5, 2.5, 4.0, 100, false);
 
-            if(clusterInModule["cern"] && clusterInModule["HD2"] && clusterInModule["HD1"]) ++missedEvents;
 
-            if(clusterInModule["cern"] && clusterInModule["slayer"] && clusterInModule["HD2"] && clusterInModule["HD1"]){ // if cluster in all modules store the slayer one for analysis
-                clCreators["simulation"].FindClustersInEventBoole((*data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
-                ++foundEvents;
-            }
+        if(  clustersInModule["cern"].size() == 1
+          && clustersInModule["slayer"].size() == 1
+          && clustersInModule["HD2"].size() == 1
+          //&& clustersInModule["HD1"].size() == 1
+          ){
+
+          clustersInModule["slayer"] = clCreators["simulation"].FindClustersInEventBoole(*(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+
+          allModulesHaveOneClusterCnt++;
+
+          xPositions = {
+            clustersInModule["HD2"][0]->GetChargeWeightedMean() * 250.,
+            clustersInModule["slayer"][0]->GetChargeWeightedMean() * 250.,
+            clustersInModule["cern"][0]->GetChargeWeightedMean() * 250.
+
+          };
+
+          //std::cout << "Cluster in:\n"
+          //          << "\tHD2:\t" << clustersInModule["HD2"][0]->GetChargeWeightedMean() << "\n"
+          //          << "\tslayer:\t" << clustersInModule["slayer"][0]->GetChargeWeightedMean() << "\n"
+          //          << "\tcern:\t" << clustersInModule["cern"][0]->GetChargeWeightedMean() << "\n";
+
+          double dx = xPositions[2] - xPositions[0];
+          double dz = zPositions[2] - zPositions[0];
+
+          double slope =  dx / dz;
+          double constant = xPositions[0];
+
+          //std::cout << "Track is " << constant << " + " << slope << " * x\n";
+
+          double trackAtSlayer = constant + slope * zPositions[1];
+          //std::cout << "Track at slayer should be " << trackAtSlayer << " and is " << xPositions[1] << "\n";
+          if(produceOffsetFile) xOffsets.push_back(trackAtSlayer - xPositions[1]);
+          else{
+            track_distances.push_back(trackAtSlayer - xPositions[1] - xOffsets[0]);
+          }
+
 
         }
+
+        //std::cout << "Clusters in ";
+        //for(const auto& matAndClusterVec : clustersInModule){
+        //  std::cout << matAndClusterVec.first << " : " << matAndClusterVec.second.size() << "\t";
+        //}
+        //std::cout << "\n";
+        if(!clustersInModule["cern"].empty() && !clustersInModule["HD2"].empty()) ++missedEvents;
+
+        if(!clustersInModule["cern"].empty() && !clustersInModule["slayer"].empty() && !clustersInModule["HD2"].empty()){ // if cluster in all modules store the slayer one for analysis
+          //clCreators["simulation"].FindClustersInEventBoole((*data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+          ++foundEvents;
+
+        }
+
+      }
+
+    }
+
+    if(produceOffsetFile){
+      //fit gaussian to offsets
+      TCanvas can_offset;
+
+      std::cout << "Collected " << xOffsets.size() << " xoffsets\n";
+
+      double sum = std::accumulate(xOffsets.begin(), xOffsets.end(), 0.0);
+      double mean = sum / xOffsets.size();
+
+      double sq_sum = std::inner_product(xOffsets.begin(), xOffsets.end(), xOffsets.begin(), 0.0);
+      double stdev = std::sqrt(sq_sum / xOffsets.size() - mean * mean);
+
+      std::cout << "mean: " << mean << " stdev: " << stdev << "\n";
+
+      RooRealVar rv_xoffset("rv_xoffset", "", mean - 300 , mean + 300);
+
+      RooDataSet dataset_xoffset("dataset_xoffset", "", RooArgSet(rv_xoffset));
+      for(const auto xoffset : xOffsets){
+        if(xoffset > mean + 300 || xoffset < mean - 300) continue;
+
+        //std::cout << "Adding " << xoffset << " to offset dataset\n";
+        rv_xoffset.setVal(xoffset);
+        dataset_xoffset.add(RooArgSet(rv_xoffset));
+      }
+      dataset_xoffset.Print();
+      RooRealVar rv_mean("rv_mean", "", mean, mean - 100 , mean + 100);
+      RooRealVar rv_sigma("rv_sigma", "", 50, 0,  100);  
+      RooGaussian gauss("gauss", "", rv_xoffset, rv_mean, rv_sigma);
+
+      RooFitResult* fr = gauss.fitTo(dataset_xoffset, RooFit::Save(true), RooFit::Minimizer("Minuit2", "minimize"));
+
+      RooPlot* plot = rv_xoffset.frame();
+      dataset_xoffset.plotOn(plot);
+      gauss.plotOn(plot);
+      plot->Draw();
+
+      can_offset.SaveAs("/home/tobi/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".pdf") );
+
+      fr->Print("v");
+
+      std::ofstream offsetFile( ("/home/tobi/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data() );
+      offsetFile << rv_mean.getVal() << "\n";
+      offsetFile.close();
+
+      // restart and run with offsets
+      return main(argc, argv);
+
     }
 
     if(c.simulation){
-        std::cout << "Found " << clCreators["simulation"].getNumberOfClusters() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
-        std::cout << "Missed " << missedEvents << " events\n";
-        double event2OneOrMoreClusterEff = 1. - (double)missedEvents/data["simulation"]->size();
-        std::cout << "Rate of MCEvent producing one or more clusters: " << event2OneOrMoreClusterEff << " +/- "
-                  << TMath::Sqrt( (1-event2OneOrMoreClusterEff)*event2OneOrMoreClusterEff/(double)data["simulation"]->size() )  << "\n";
+      std::cout << "Found " << clCreators["simulation"].getNumberOfClusters() << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
+      std::cout << "Missed " << missedEvents << " events\n";
+      double event2OneOrMoreClusterEff = 1. - (double)missedEvents/data["simulation"]->size();
+      std::cout << "Rate of MCEvent producing one or more clusters: " << event2OneOrMoreClusterEff << " +/- "
+      << TMath::Sqrt( (1-event2OneOrMoreClusterEff)*event2OneOrMoreClusterEff/(double)data["simulation"]->size() )  << "\n";
     }
     else{
       std::cout << "Found " << missedEvents << " events that caused one or more cluster in all three but the slayer modules.\n";
@@ -221,10 +360,17 @@ int main(int argc, char *argv[]){
 
     if (c.clusterAlg == "m") c.tag += "_max";
 
+    std::map<std::string, std::vector<double>> features;
+    features["distance_from_track"] = track_distances;
+
     ClusterMonitor clMonitor;
-    clMonitor.WriteToNtuple(clCreators["simulation"], ("/home/tobi/SciFi/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data() );
+    clMonitor.WriteToNtuple(clCreators["simulation"], 
+      ("/home/tobi/SciFi/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data(),
+      features );
 
   }
+
+  std::cout << "Events where all modules have exactly one cluster: " << allModulesHaveOneClusterCnt << "\n";
 
   return 0;
 }

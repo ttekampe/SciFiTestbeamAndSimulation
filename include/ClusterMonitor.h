@@ -3,6 +3,7 @@
 
 //from std
 #include <vector>
+#include <map>
 #include <utility>
 
 //from here
@@ -17,8 +18,9 @@ private:
 public:
   ClusterMonitor(){};
   ~ClusterMonitor(){};
+  typedef std::map<std::string, std::vector<double> > feature_map;
 
-  void WriteToNtuple(const ClusterCreator& clCreator, std::string fileName);
+  void WriteToNtuple(const ClusterCreator& clCreator, const std::string fileName, const feature_map features = feature_map());
 
 
 };
