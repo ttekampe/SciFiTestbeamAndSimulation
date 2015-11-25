@@ -80,6 +80,7 @@ set(ALL_LIBRARIES ${ROOT_LIBRARIES} ${ROOFIT_LIBRARIES} ${ADDITIONAL_LIBRARIES} 
 
 add_subdirectory(src)
 add_subdirectory(main)
+add_subdirectory(energyCorrection)
 
 #MACRO(SUBDIRLIST result curdir)
 #  FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)

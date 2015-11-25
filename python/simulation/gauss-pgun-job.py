@@ -18,9 +18,6 @@ sys.path.append(local_dir)
 
 from Configurables import LHCbApp, CondDB
 
-
-
-
 def execute(pos="c", angle=0):
   importOptions("$APPCONFIGOPTS/Gauss/Beam7000GeV-md100-nu7.6-HorExtAngle.py")
 
@@ -33,6 +30,9 @@ def execute(pos="c", angle=0):
   outpath = "testbeam_simulation_position_" + pos  + '_at_' + str(angle) + 'deg'
 
   Gauss().DataType = "Upgrade"
+
+  #LHCbApp().DDDBtag = "dddb-20150424"
+  #LHCbApp().CondDBtag = "sim-20140204-vc-md100"
 
   LHCbApp().DDDBtag = "dddb-20150424"
   LHCbApp().CondDBtag = "sim-20140204-vc-md100"

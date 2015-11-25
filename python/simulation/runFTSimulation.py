@@ -37,7 +37,7 @@ LHCbApp().DDDBtag = "dddb-20150424"
 LHCbApp().CondDBtag = "sim-20140204-vc-md100"
 
 #work around for bug in DB
-CondDB().LoadCALIBDB = 'HLT1'
+#CondDB().LoadCALIBDB = 'HLT1'
 
 
 # Configure all the unpacking, algorithms, tags and input files
@@ -77,6 +77,7 @@ MCFTDepositCreator().addTool(att)
 MCFTDepositCreator().SpillVector = ["/"]
 MCFTDepositCreator().SpillTimes = [0.0]
 MCFTDepositCreator().UseAttenuation = True
+#MCFTDepositCreator().SimulateNoise = True
 #MCFTDepositCreator().AttenuationToolName = "Julians nice tool"
 
 
@@ -85,16 +86,21 @@ tof = 25.4175840541
 
 
 MCFTDigitCreator().IntegrationOffset = [26 - tof, 28 - tof, 30 - tof]
-MCFTDigitCreator().SimulateNoise = True
+
+#
 #MCFTDigitCreator().Temperature =
-MCFTDigitCreator().Irradiation = 0.0
+#MCFTDigitCreator().Irradiation = 0.0
 MCFTDigitCreator().SiPMGain = sipm_gain = 1000.
-MCFTDigitCreator().CrossTalkProbability = 0.13
+#MCFTDigitCreator().CrossTalkProbability = 0.13
 
-f_5l = 0.57595865315812876038
-f_6l = 0.63798496965208108843
+#f_5l = 0.57595865315812876038
+#f_6l = 0.63798496965208108843
 
-MCFTDigitCreator().PhotoElectronsPerMeV = 120. * f_5l
+#MCFTDigitCreator().PhotoElectronsPerMeV = 120. * f_5l
+
+#MCFTDigitCreator().ClusterLowThreshold  = 3 * 500
+#MCFTDigitCreator().ClusterMidThreshold = 5 * 500
+#MCFTDigitCreator().ClusterHighThreshold = 9 * 500
 
 #from Configurables import FTClusterCreator
 #MCFTClusterCreator().ADCThreshold = #neighbor threshold
@@ -169,8 +175,10 @@ for layerNumber in xrange(nLayer):
   sipmValPtr.append(sipmValPtr_thisLayer)
 
 
+#i = 0
 while True:
   appMgr.run(1)
+
   if not evt['MC/Particles']:
     print "no more particles"
     break
@@ -184,7 +192,9 @@ while True:
     t.Fill()
   resetSipmVals(sipmValPtr)
 
-
+  #i+=1
+  #if i>100:
+  #  break
 
 outputFile.cd()
 for t in outputTrees:
@@ -195,3 +205,5 @@ outputFile.Close()
 #c = R.TCanvas()
 #h1.Draw("e")
 #c.SaveAs("finAttMap.pdf")
+
+#sys.exit()
