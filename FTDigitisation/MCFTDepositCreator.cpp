@@ -75,16 +75,6 @@ MCFTDepositCreator::MCFTDepositCreator( const std::string& name,
   declareProperty( "UseAttenuation"             , m_useAttenuation              = true );
   
   declareProperty( "PutMCParticlePcut"          , m_putMCParticlePcut           = 0. , "apply lower P cut on MCParticles");
-
-  declareProperty( "SimulateNoise"              , m_simulateNoise               = true, "Simulate noise");
-  declareProperty( "KillSignal"                 , m_killSignal                  = false, "Remove signal deposits");
-  declareProperty( "ThermalNoiseRate"           , m_thermalNoiseRate            = 7., "Thermal noise rate @ -40 deg.C");
-  declareProperty( "ThermalNoiseWindows"        , m_rdwindows                   = 2,  "Thermal noise readout windows of 25ns to simulate");
-  declareProperty( "CrossTalkProb"              , m_crossTalkProb               = 0.10, "Cross-talk probability per PE");
-  declareProperty( "AfterpulseProb"             , m_afterpulseProb              = 0.02, "Afterpulse probability per PE");
-  declareProperty( "PhotoElectronsPerMeV"       , m_photoElectronsPerMeV        = 120. );  // 0.21 MeV per MIP, 25 photoelectrons per MIP
-
-  declareProperty( "DepositPositionToolName", m_depositPositionToolName = "MCFTDepositPositionTool");
   
 
 
@@ -93,7 +83,6 @@ MCFTDepositCreator::MCFTDepositCreator( const std::string& name,
 // Destructor
 //=============================================================================
 MCFTDepositCreator::~MCFTDepositCreator() {}
-
 
 //=============================================================================
 // Initialization
@@ -121,21 +110,13 @@ StatusCode MCFTDepositCreator::initialize() {
     if( sc.isFailure() ) return Error( "Could not initialize attenuation tool", sc );
   }
   
-  m_depositPositionTool = tool<IMCFTDepositPositionTool>( m_depositPositionToolName, this );
-  if( m_depositPositionTool == nullptr ){
-    error() << "Could not find: " << m_depositPositionToolName << endmsg;
-  }
-
-  sc = m_depositPositionTool->initializeTool();
-  if( sc.isFailure() ) return Error( "Could not initialize deposit position tool", sc );
-  
 
   // Retrieve and initialize DeFT (no test: exception in case of failure)
   m_deFT = getDet<DeFTDetector>( DeFTDetectorLocation::Default );
 
   m_numLayers = m_deFT->layers().size();
   
-  if(m_deFT->version() >= 20 ){
+  if(m_deFT->version() == 20 ){
     // THIS HAS TO BE CHECKED, WHAT HAPPENS IF FIBRE MAT IS EMPTY???
     m_yMax = m_deFT->fibremats()[0]->layerMaxY();
     if ( msgLevel( MSG::DEBUG) ) debug() << "[initialize] RUN NEW GEOMETRY" << endmsg;
@@ -147,9 +128,8 @@ StatusCode MCFTDepositCreator::initialize() {
   // Initialize random generator
   sc = m_flatDist.initialize( randSvc(), Rndm::Flat(0.0,1.0) );
   if ( sc.isFailure() ) return Error( "Failed to get Rndm::Flat generator", sc );
-  sc = m_rndmLandau.initialize( randSvc(), Rndm::Landau(39.0, 7.8) ); // for noise, from a fit to the
-                                                                      // MCHit cluster charge (6bit ADC)
-  if ( sc.isFailure() ) return Error( "Failed to get Rndm::Landau generator", sc );
+  
+ 
 
   // construct container names once
   for( const std::string spillName : m_spillVector){
@@ -158,8 +138,6 @@ StatusCode MCFTDepositCreator::initialize() {
   
   return StatusCode::SUCCESS;
 }
-
-
 
 //=============================================================================
 // Main execution
@@ -198,12 +176,12 @@ StatusCode MCFTDepositCreator::execute() {
       // check if we need to apply a cut on MCParticle properties first
       double MCP = ftHit -> mcParticle() -> p();
       if(m_putMCParticlePcut != 0.) {
-        plot( MCP, "MCParticle_P", "MCParticle Momentum (per MCHit); P [GeV/c]; N MCHits", 0., 200., 200 );
         if( MCP < m_putMCParticlePcut ) { 
           plot( MCP, "MCParticle_P_cutout", "MCParticle Momentum (per MCHit) cutout; P [GeV/c]; N MCHits", 0., 200., 200 );
           continue;
         }
       }
+      plot( MCP, "MCParticle_P", "MCParticle Momentum (per MCHit); P [GeV/c]; N MCHits", 0., 200., 200 );
       
       counter("NbOfMCHits")++;
       
@@ -235,11 +213,9 @@ StatusCode MCFTDepositCreator::execute() {
       // Get the list of fired FTChannel from the (x,y,z) position of the hit, with, 
       // for each FTChannel, the relative distance to the middle of the cell of the barycentre 
       // of the (entry point, endpoint) system :
-      if(m_deFT->version() >= 20 ){
- 
-        StatusCode sc;
-        if( !m_killSignal ) 
-          sc = hitToChannelConversion(ftHit,depositCont,iSpill);
+      if(m_deFT->version() == 20 ){
+        
+        StatusCode sc = hitToChannelConversion(ftHit,depositCont,iSpill);
         
         if (  sc.isFailure() ){
           error() << " HitToChannelConversion() FAILED" << endmsg; 
@@ -255,199 +231,9 @@ StatusCode MCFTDepositCreator::execute() {
     ++iSpill;
     
   } // loop on spills
-
   
-  
-
-
-  //=========================================================
-  // add noise deposits
-  if(m_simulateNoise) {
-    debug() << " -- STARTING NOISE DEPOSIT CALCULATIONS" << endmsg;
-    
-    // Get channels containing a deposit from an MCHit
-    //FTchanDepMap mapChannels;
-    //for (MCFTDeposits::const_iterator iterDeposit = depositCont->begin(); iterDeposit!=depositCont->end();++iterDeposit){
-    //  MCFTDeposit* mcDeposit = *iterDeposit;
-    //  mapChannels.insert( FTchanDep( mcDeposit -> channelID(), mcDeposit ) );
-    //}
-  
-    std::vector<double> intOffsets = boost::assign::list_of(26*Gaudi::Units::ns)
-                                                           (28*Gaudi::Units::ns)
-                                                           (30*Gaudi::Units::ns);//  tof (21+2+2)
-                                                                        // + full fiber propagation time (15) 
-                                                                        // - integration rise (15)
-    
-
-
-    //====== THERMAL NOISE ======
-    //
-    // Set thermal noise propoerties
-    float readoutFreq   =  40. / m_rdwindows; // MHz
-    float tempCoef      =  10.; // deg.C for factor 2 reduction
-    float startTemp     = -40.; // assumption
-    float m_irradiation =   6.; // <-- should be made configurable
-    float m_temperature = -40.; // <-- should be made configurable
-    float startIrrad    =   6.; // x10^11 neq/cm2
-    float noiseProb = (m_thermalNoiseRate/readoutFreq) * (m_irradiation / startIrrad)
-      * pow(2, (m_temperature - startTemp)/tempCoef);
-    int NthermalNoise = Ntotchannels * noiseProb; // N_PE of noise over total detector
-
-    if ( msgLevel( MSG::DEBUG) )
-      debug() << "NthermalNoise = " << NthermalNoise << endmsg;
-
-    // Loop over all noise PEs
-    for(int i=0; i<NthermalNoise; i++) {
-
-      // Get random channel and time to add 1 PE to
-      int layer    = int( m_flatDist() * Nlayers );
-      int module   = int( m_flatDist() * NModule);
-      int mat      = int( m_flatDist() * NMat );
-      int sipmID   = int( m_flatDist() * Nsipms );
-      int sipmCell = int( m_flatDist() * Nchannels);
-      FTChannelID noiseChannel(layer, module, mat, sipmID, sipmCell);
-
-      int Npe = 1;
-      double Energy = float(Npe) / m_photoElectronsPerMeV; 
-      double TOA = m_flatDist() * 25. * m_rdwindows * Gaudi::Units::ns; // we simulate more than 25ns for the time response
-      TOA += intOffsets[ noiseChannel.layer() / 4 ] - ((m_rdwindows-1.)*0.25/2.)*Gaudi::Units::ns; // subtract integration time offset per station 
-
-      addNoiseDeposit(noiseChannel, Energy, TOA, 0, 1, depositCont);
-      plot2D(noiseChannel.channelID(), TOA, "ThermalNoiseTOA","ThermalNoiseTOA; channelID; TOA [ns]", 0., (float)Ntotchannels*(12./9.), 0., 100, Ntotchannels/Nchannels * (12./9.), 100);
-      plot2D(noiseChannel.channelID(), Energy, "ThermalNoiseEnergy","ThermalNoiseEnergy; channelID; Energy [MeV]", 0., (float)Ntotchannels*(12./9.), 0., 0.1, Ntotchannels/Nchannels * (12./9.), 100);
-
-    } // end of loop over noise PEs
-
-
-    //====== AFTERPULSING ======
-
-    
-    // Initialize some numbers for the occupancy distribution
-    double N   = 102.;    // these numbers are the result of a fit
-    double c   = 393.;    //  to an occupancy profile
-    double e1  = 0.00168;
-    double e2  = -0.00032;
-    double off = 26.;
-
-    double norm = N * exp( e1 * c ) / exp( e2 * c );
-    double intBeg = 0.;
-    double intEnd = Nchannels*Nsipms;
-    double integralBeforCut = off*(c-intBeg) + (N   /e1) * ( exp(e1*c     ) - exp(e1*intBeg) );
-    double integralAfterCut = off*(intEnd-c) + (norm/e2) * ( exp(e2*intEnd) - exp(e2*c     ) );
-    
-    // These are the integrated 25ns bin values of Figure 8 of the support note (afterpulse time distribution).
-    // Values used here are trec = 20ns, tshort = 25ns, tlong = 100ns, fshort = 0.5.
-    float NsumBinFractions[20] = { 0.204691106081,  0.176326997846,  0.132542585516,  0.0997058439121,  0.0760373252544,
-                                   0.0585607741894,  0.0453520643227,  0.0352234776303,  0.0273958443495,  0.0213224364803,  
-                                   0.0166009440283,  0.0129269868938,0.010066868574,  0.00783983501193,  0.00610557755609,  
-                                   0.00475499468632,  0.0037031811119,  0.00288403576027,  0.00224608761991,  0.001749254176 };
-    float NsumBinFracCum[20] = {0.};
-    float sum=0.;
-    for (int j=0; j<20; j++){
-      sum += NsumBinFractions[j];
-      NsumBinFracCum[j] = sum;
-    }
-
-    int NavgClusInEvent = int(396788./100.); // Based on 100 events, nu=7.6, Bs2phiphi, TDR time, with noise. 
-    NavgClusInEvent *= m_rdwindows; // increase amount of noise with readout window
-
-    // loop over all 'clusters in the event'
-    int Napcharges[20] = {0};
-    for(int i=0; i<NavgClusInEvent; i++) {
-
-      // get Nap for this cluster
-      int Npe=100;
-      while(Npe > 30) { Npe = (m_rndmLandau()/2.) * m_afterpulseProb; }
-      Rndm::Numbers rndmPoisson(randSvc(), Rndm::Poisson( Npe ) );
-      int Nap = rndmPoisson();
-
-      // drop each Nap in a time bin
-      int Naptimes[21] = {0}; // 1 overflow time bin
-      for(int ap=0; ap<Nap; ap++) {
-        float r = m_flatDist();
-        for (int j=0; j<20; j++) {
-          if (r < NsumBinFracCum[j]) {
-            Naptimes[j]++;
-            plot(j,"hitAfterpulseTimeDist","hitAfterpulseTimeDist; hitAfterpulseTimeDist", 0., 21., 21);
-            break;
-          }
-        }
-      }
-
-      // count bins with same number of entries.
-      // These will be groups of simultaneously fired pixels (within 25ns) in the same channel. 
-      for(int t=0; t<20; t++) {
-        Napcharges[ Naptimes[t] ]++;
-        plot(Naptimes[t], "hitAfterpulsePE","hitAfterpulsePE; hitAfterpulsePE", 0., 20., 20);
-      }
-    } // end of looping over all 'clusters in the event'
-
-    // loop over all hit afterpulses
-    for(int i=1; i<20; i++) { // skip the 0 count groups
-      for( int j=0; j<Napcharges[i]; j++) {
-
-        int Npe = i;
-
-        // create random channel according to occupancy
-        // FUNCTION of IDCell occupancy distribution per quarter (fit):
-        //if (x <= c) {     y = off + N * exp( e1 * x );   }
-        //if (x > c) {    double norm = N * exp( e1 * c ) / exp( e2 * c );     y = off + norm * exp( e2 * x );   }
-
-        int sipmID = -1;
-        int sipmCell = -1;
-        int IDCell;
-        while(sipmID < 0 || sipmID > Nsipms || sipmCell < 0 || sipmCell > Nchannels) { // safety check for rawBankEncoder
-          if (m_flatDist() * (integralBeforCut+integralAfterCut) < integralBeforCut) {
-            // first expo
-            double randRange = (off+N*exp(e1*intBeg)) + m_flatDist()*( (off+N*exp(e1*c)) - (off+N*exp(e1*intBeg)));
-            double randExp = log( (randRange-off)/N ) / e1;
-            IDCell = int( randExp + 0.5 );
-          } else {
-            // second expo
-            double randRange = (off+norm*exp(e2*intEnd)) + m_flatDist()*( (off+norm*exp(e2*c)) - (off+norm*exp(e2*intEnd)));
-            double randExp = log( (randRange-off)/norm ) / e2;
-            IDCell = int( randExp + 0.5 );
-          }
-          int bitShiftsipmID = 7;
-          sipmID = (IDCell >> bitShiftsipmID);
-          sipmCell = IDCell - sipmID * pow(2,bitShiftsipmID);
-        }
-
-        // Now that we have the IDCell (= sipmID and sipmCell, represents 1 quarter), get random quarter:
-        double r = m_flatDist()*(Nlayers);
-        int layer = int(r);
-        r = m_flatDist()*(NModule);
-        int module = int(r);
-        r = m_flatDist()*(NMat);
-        int mat = int(r);
-        FTChannelID noiseChannel(layer, module, mat, sipmID, sipmCell);
-
-        double Energy = 1. / m_photoElectronsPerMeV; 
-        for(int k=0; k<Npe; k++) {
-          // loop over all PE's that will end up in one channel in one window. They still need a random time per PE.
-          double TOA = m_flatDist() * 25. * m_rdwindows * Gaudi::Units::ns; // we simulate more than 25ns for the time response
-          TOA += intOffsets[ noiseChannel.layer() / 4 ] - ((m_rdwindows-1.)*0.25/2.)*Gaudi::Units::ns; // subtract integration time offset per station 
-
-          addNoiseDeposit(noiseChannel, Energy, TOA, 1, 1, depositCont);
-          plot2D(noiseChannel.channelID(), TOA, "AfterPulseTOA","AfterPulseTOA; channelID; TOA [ns]", 0., (float)Ntotchannels * (12./9.), 0., 100., Ntotchannels/Nchannels * (12./9.), 100);
-          plot2D(noiseChannel.channelID(), Energy, "AfterPulseEnergy","AfterPulseEnergy; channelID; Energy [MeV]", 0., (float)Ntotchannels * (12./9.), 0., .1, Ntotchannels/Nchannels * (12./9.), 100);
-        }
-      }
-    }
-
-
-    
-    
-    //===== END OF NOISE =====
-    
-  }
-  //=========================================================
-
   return StatusCode::SUCCESS;
 }
-
-
-
 //=========================================================================
 // Convert the hit into channels
 //=========================================================================
@@ -457,8 +243,9 @@ StatusCode MCFTDepositCreator::hitToChannelConversion(LHCb::MCHit* ftHit, LHCb::
   const DeFTFibreMat* pL = m_deFT->findFibreMat(ftHit->midPoint());
   FTDoublePairs channels;
   
-  if ( msgLevel( MSG::DEBUG) )
+  if ( msgLevel( MSG::DEBUG) ) {
     debug() << "[HitToChannelConversion] RUN NEW GEOMETRY" << endmsg;
+  }
 
 
   if ( pL == nullptr) {
@@ -469,12 +256,10 @@ StatusCode MCFTDepositCreator::hitToChannelConversion(LHCb::MCHit* ftHit, LHCb::
   
   // -- If this fails, it's mostly due to geometrical reasons (in FTDet v2.0)
   // -- so not dangerous
-  //if( pL->calculateListOfFiredChannels( ftHit, channels) == StatusCode::FAILURE){
-  //  if ( msgLevel( MSG::DEBUG) ) debug() << "Could not calculate list of fired channels" << endmsg;
-  //  return StatusCode::SUCCESS;
-  //}
-
-  m_depositPositionTool->firedChannels(ftHit, *pL, channels);
+  if( pL->calculateListOfFiredChannels( ftHit, channels) == StatusCode::FAILURE){
+    if ( msgLevel( MSG::DEBUG) ) debug() << "Could not calculate list of fired channels" << endmsg;
+    return StatusCode::SUCCESS;
+  }
   
   counter("NbOfHitInActiveArea")++;     
   counter("NbOfFiredChannels") += channels.size();
@@ -525,24 +310,14 @@ StatusCode MCFTDepositCreator::hitToChannelConversion(LHCb::MCHit* ftHit, LHCb::
   if(positiveEnergy){
 
     for( FTDoublePair ftPair : channels ){
-      double directEnergyInSiPM    = ftPair.second * att;
-      double reflectedEnergyInSiPM = ftPair.second * attRef;
+      const double directEnergyInSiPM    = ftPair.second * att;
+      const double reflectedEnergyInSiPM = ftPair.second * attRef;
       
       
       if ( msgLevel( MSG::DEBUG) ){
         debug()  << "[FTCHANNEL] FTChannel=" << ftPair.first 
                  << " DirectEnergyHitFraction="<< directEnergyInSiPM 
                  << " ReflectedEnergyHitFraction="<< reflectedEnergyInSiPM << endmsg;
-      }
-      
-      // -- add XTalk
-      int totalXtalk = 0;
-      if(m_simulateNoise) {
-        auto xtalkDirect = addXtalk( directEnergyInSiPM );
-        auto xtalkReflected = addXtalk( reflectedEnergyInSiPM );
-        directEnergyInSiPM = xtalkDirect.second;
-        reflectedEnergyInSiPM = xtalkReflected.second;
-        totalXtalk = xtalkDirect.first + xtalkReflected.first;
       }
       
       
@@ -560,21 +335,18 @@ StatusCode MCFTDepositCreator::hitToChannelConversion(LHCb::MCHit* ftHit, LHCb::
       plot(reflectedEnergyInSiPM,"ReflectedEnergyRecordedInCellZOOM",
            "ReflectedEnergyRecordedInCell; EnergyReachingSiPM [MeV]; Nber of Channels" ,0. ,1);
       // ---------------------------------------------------------------------------------------
-
       
       
       // -- if reference to the channelID already exists, just add DepositedEnergy and arrival time
       LHCb::MCFTDeposit* deposit = depositCont->object(ftPair.first);
       if( deposit != nullptr ){
         deposit->addMCHit(ftHit, directEnergyInSiPM, reflectedEnergyInSiPM, timeToSiPM, timeRefToSiPM);
-        deposit->addNoise(totalXtalk, 2);
         counter("NbOfAppendDeposit")++;
       } else {
         if ( ftPair.first.layer() < m_numLayers ) { // Set to 12 instead 15 because of a bug in new geometry
           // else, create a new fired channel but ignore fake cells, i.e. not readout, i.e. layer 15
           MCFTDeposit* energyDeposit = new MCFTDeposit(ftPair.first,ftHit,directEnergyInSiPM, 
                                                        reflectedEnergyInSiPM,timeToSiPM,timeRefToSiPM);
-          energyDeposit->addNoise(totalXtalk, 2);
           depositCont->insert(energyDeposit, ftPair.first);
           counter("NbOfCreatedDeposit")++; 
         }else if ( ftPair.first.layer() >= m_numLayers ){
@@ -582,8 +354,6 @@ StatusCode MCFTDepositCreator::hitToChannelConversion(LHCb::MCHit* ftHit, LHCb::
           if ( msgLevel( MSG::DEBUG) ) debug() << "hit is not within range of physical layers" << endmsg;
         }
       }
-      plot2D(ftPair.first.channelID(), timeToSiPM, "directTOA","directTOA; channelID; TOA [ns]", 0., (float)Ntotchannels*(12./9.), 0., 100., Ntotchannels/Nchannels*(12./9.), 100);
-      plot2D(ftPair.first.channelID(), timeRefToSiPM, "reflectedTOA","reflectedTOA; channelID; TOA [ns]", 0., (float)Ntotchannels*(12./9.), 0., 100., Ntotchannels/Nchannels*(12./9.), 100);
     }
   }else{
     
@@ -652,51 +422,3 @@ void MCFTDepositCreator::plotChannelProperties(const DeFTFibreMat* pL, FTDoubleP
   // ----------------------------------------
 
 }
-
-//double MCFTDepositCreator::Pafterpulse(double t) {
-//  double t_rec   =  20. ;
-//  double t_short =  25. ;
-//  double t_long  = 100. ;
-//  double f_short =   0.5;
-//  double Norm = 1./48.2742;
-//  double Pap = Norm * (1 - exp(t/t_rec)) * ( f_short * exp(t/t_short) + (1-f_short) * exp(t/t_long) );
-//  return Pap;
-//}
-
-void MCFTDepositCreator::addNoiseDeposit(LHCb::FTChannelID noiseChannel, double Energy, double TOA, int type, int npe, LHCb::MCFTDeposits* depositCont) {
-      
-      LHCb::MCHit* dummyMCHit = 0; 
-
-      // -- add XTalk
-      std::pair<int,double> xtalkPair = addXtalk( Energy );
-      Energy = xtalkPair.second;
-    
-      plot2D(Energy,TOA, "NoiseDepositContributions","NoiseDepositContributions;Energy [MeV];Time [ns]",0.,0.1, 0., 100., 100,100);
-      
-      // -- if reference to the channelID already exists, just add DepositedEnergy and arrival time
-      LHCb::MCFTDeposit* deposit = depositCont->object( noiseChannel );
-      if( deposit != nullptr ){
-        deposit->addMCHit( dummyMCHit, Energy, 0., TOA, 0.);
-        deposit -> addNoise(type,npe);
-        deposit -> addNoise(2, xtalkPair.first);
-      } else {
-        MCFTDeposit* noiseDeposit = new MCFTDeposit( noiseChannel, dummyMCHit, Energy, 0., TOA, 0. ); 
-        noiseDeposit -> addNoise(type,npe);
-        noiseDeposit -> addNoise(2, xtalkPair.first);
-        depositCont->insert(noiseDeposit, noiseChannel);
-      }
-}
-
-std::pair<int,double> MCFTDepositCreator::addXtalk(double Energy) {
-  float Npe = Energy * m_photoElectronsPerMeV;
-  float mean = Npe * m_crossTalkProb;
-  Rndm::Numbers rndmPoisson(randSvc(), Rndm::Poisson( mean ) );
-  int Nxtalk = rndmPoisson();
-  float EnergyAdd = Nxtalk / m_photoElectronsPerMeV;
-  plot(Nxtalk, "NXtalk","NXtalk; PE;",0.,30.,30);
-  plot2D(Energy, Energy+EnergyAdd, "xTalkEnergy","xTalkEnergy; Energy; Energy+EnergyAdd [MeV]", 0., .5, 0., .5, 200, 200);
-  std::pair<int,double> retval = std::make_pair(Nxtalk,Energy + EnergyAdd);
-  return retval;
-}
-
-

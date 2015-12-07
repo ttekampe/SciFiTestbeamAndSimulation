@@ -177,13 +177,13 @@ int main(int argc, char *argv[]){
     std::vector<double> zPositions = {0., 247.0*1000, 469.0*1000}; // HD2, Slayer, CERN
 
     if(c.simulation){
-      data["simulation"] = parseCorrectedRootTree(inputTree, 1, 4, 128, true);
+      data["simulation"] = parseCorrectedRootTree(inputTree, 1, 4, 128);
     }
     else{
-      data["cern"] = parseCorrectedRootTree(inputTree, 1, 2, 128, false);
-      data["slayer"] = parseCorrectedRootTree(inputTree, 3, 4, 128, false);
-      data["HD2"] = parseCorrectedRootTree(inputTree, 5, 6, 128, false);
-      //data["HD1"] = parseCorrectedRootTree(inputTree, 7, 8, 128, false);
+      data["cern"] = parseCorrectedRootTree(inputTree, 1, 2, 128);
+      data["slayer"] = parseCorrectedRootTree(inputTree, 3, 4, 128);
+      data["HD2"] = parseCorrectedRootTree(inputTree, 5, 6, 128);
+      //data["HD1"] = parseCorrectedRootTree(inputTree, 7, 8, 128);
     }
 
     std::map<std::string, ClusterCreator> clCreators;
