@@ -129,7 +129,9 @@ int main(int argc, char *argv[]){
 
     TTree* inputTree;
     if(c.simulation){
-      inputTree = dynamic_cast<TTree*>( inputFile.Get("layer_0") );
+      std::string tree("layer_11");
+      std::cout << "reading tree " << tree << "\n";
+      inputTree = dynamic_cast<TTree*>( inputFile.Get(tree.c_str()) );
     }
     else{
       inputTree = dynamic_cast<TTree*>( inputFile.Get("rawData") );

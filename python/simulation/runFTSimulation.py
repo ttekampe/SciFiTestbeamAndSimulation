@@ -10,7 +10,7 @@ import GaudiPython as GP
 from GaudiConf import IOHelper
 from Configurables import LHCbApp, ApplicationMgr, DataOnDemandSvc
 from Configurables import SimConf, DigiConf, DecodeRawEvent
-from Configurables import CondDB
+from Configurables import CondDB, DDDBConf
 
 import array
 
@@ -31,10 +31,16 @@ def resetSipmVals(sipimValPtr):
 
 LHCbApp().Simulation = True
 CondDB().Upgrade = True
+CondDB().addLayer(dbFile = "/home/tobi/eve/SciFi/FTv5/DDDB_FTv5_20150424_s20140204_lhcbv38r6.db", dbName="DDDB" )
 
 
 LHCbApp().DDDBtag = "dddb-20150424"
 LHCbApp().CondDBtag = "sim-20140204-vc-md100"
+DDDBConf().DbRoot = "/home/ttekampe/SciFi/FTv5/DDDB_FTv5_20150424_s20140204_lhcbv38r6/lhcb.xml"
+
+
+#LHCbApp().DDDBtag = "dddb-20150424"
+#LHCbApp().CondDBtag = "sim-20140204-vc-md100"
 
 #work around for bug in DB
 #CondDB().LoadCALIBDB = 'HLT1'
@@ -64,8 +70,8 @@ MCFTDigitCreator().Force2bitADC = 0
 
 from Configurables import MCFTAttenuationTool
 att = MCFTAttenuationTool()
-att.ShortAttenuationLength = 491.7 # 200mm
-att.LongAttenuationLength = 3526. # 4700mm
+#att.ShortAttenuationLength = 491.7 # 200mm
+#att.LongAttenuationLength = 3526. # 4700mm
 att.FractionShort = 0.234 # 0.18
 
 #make sure I always hit uirradiated zone
@@ -77,7 +83,12 @@ MCFTDepositCreator().addTool(att)
 MCFTDepositCreator().SpillVector = ["/"]
 MCFTDepositCreator().SpillTimes = [0.0]
 MCFTDepositCreator().UseAttenuation = True
-#MCFTDepositCreator().SimulateNoise = True
+MCFTDepositCreator().SimulateNoise = False
+
+#MCFTDigitCreator().SimulateNoise = False
+
+
+
 #MCFTDepositCreator().AttenuationToolName = "Julians nice tool"
 
 
@@ -87,6 +98,7 @@ tof = 25.4175840541
 
 MCFTDigitCreator().IntegrationOffset = [26 - tof, 28 - tof, 30 - tof]
 
+#MCFTDigitCreator().SimulateNoise = False
 #
 #MCFTDigitCreator().Temperature =
 #MCFTDigitCreator().Irradiation = 0.0
@@ -148,9 +160,9 @@ hist.dump()
 #sipm chanel 0 - 127
 
 
-resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/attScanWithNoise/"
+resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/sixLayers/attScan/"
 
-fileName = (cfg.file.split("/")[-1]).replace(".sim", cfg.tag + ".root")
+fileName = (cfg.file.split("/")[-1]).replace(".sim", "_{0}.root".format(cfg.tag))
 
 print("Outputfile: " + fileName)
 
@@ -176,6 +188,7 @@ for layerNumber in xrange(nLayer):
 
 
 #i = 0
+nHits = 0
 while True:
   appMgr.run(1)
 
@@ -183,23 +196,29 @@ while True:
     print "no more particles"
     break
 
+  nHits += len(evt["MC/FT/Hits"])
+
   digits = evt['/Event/MC/FT/Digits'].containedObjects()
   for digit in digits:
     if digit.channelID().sipmId() in sipmIDs and digit.channelID().module() == 1 and digit.channelID().quarter() == 3:
       sipmValPtr[digit.channelID().layer()][digit.channelID().sipmId()][digit.channelID().sipmCell()][0] = digit.adcCount() / sipm_gain
+    elif digit.channelID().layer() == 0:
+      print("Found hit at sipmID {0} in module {1} of quarter {2}".format(digit.channelID().sipmId(), digit.channelID().module(), digit.channelID().quarter()))
 
   for t in outputTrees:
     t.Fill()
   resetSipmVals(sipmValPtr)
 
   #i+=1
-  #if i>100:
+  #if i>20:
   #  break
 
 outputFile.cd()
 for t in outputTrees:
   t.Write()
 outputFile.Close()
+
+print("number of hits found: {0}".format(nHits))
 
 #h1 = hist['/stat/MCFTDepositCreator.MCFTAttenuationTool/FinalAttenuationMap']
 #c = R.TCanvas()

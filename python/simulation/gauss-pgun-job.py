@@ -25,7 +25,11 @@ def execute(pos="c", angle=0):
   importOptions("$APPCONFIGOPTS/Gauss/G4PL_FTFP_BERT_EmNoCuts.py")
   importOptions("$APPCONFIGOPTS/Conditions/Upgrade.py")
   importOptions("$APPCONFIGOPTS/Persistency/Compression-ZLIB-1.py")
-  importOptions("$APPCONFIGOPTS/Gauss/Gauss-Upgrade-Baseline-20131029.py")
+
+  #importOptions("$APPCONFIGOPTS/Gauss/Gauss-Upgrade-Baseline-20131029.py")
+  # FTv5
+  importOptions('$APPCONFIGOPTS/Gauss/Gauss-Upgrade-Baseline-20150522.py')
+  
 
   outpath = "testbeam_simulation_position_" + pos  + '_at_' + str(angle) + 'deg'
 
@@ -34,11 +38,17 @@ def execute(pos="c", angle=0):
   #LHCbApp().DDDBtag = "dddb-20150424"
   #LHCbApp().CondDBtag = "sim-20140204-vc-md100"
 
+  #LHCbApp().DDDBtag = "dddb-20150424"
+  #LHCbApp().CondDBtag = "sim-20140204-vc-md100"
+
+  # FTv5 from Luigi
   LHCbApp().DDDBtag = "dddb-20150424"
   LHCbApp().CondDBtag = "sim-20140204-vc-md100"
+  #DDDBConf().DbRoot = "/home/ttekampe/SciFi/FTv5/DDDB_FTv5_20150424_s20140204_lhcbv38r6/lhcb.xml"
 
   #work around for bug in DB
   CondDB().LoadCALIBDB = 'HLT1'
+  CondDB().addLayer(dbFile = "DDDB_FTv5_20150424_s20140204_lhcbv38r6.db", dbName="DDDB" )
 
   importOptions('$LBPGUNSROOT/options/PGuns.py')
   from Configurables import ParticleGun

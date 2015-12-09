@@ -95,7 +95,7 @@ std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
                                           ){
 
   std::vector<Event*>* dataVector = new std::vector<Event*>(dataTree->GetEntriesFast());
-  if(correctSim) std::cout << "Parsing corrected root tree and correct the adc value for difference of 5 layer to 6 layer fibremats!\n";
+  std::cout << "Parsing corrected root tree and correct the adc value by a factor of " << factor << "!\n";
   const unsigned int nUplinks = uplinkMax-uplinkMin+1;
   float** adcVals = new float*[nUplinks];
   for(unsigned int i = 0; i< nUplinks; ++i){
@@ -123,8 +123,10 @@ std::vector<Event*>* parseCorrectedRootTree(TTree* dataTree,
           c.Uplink = uplink;
           c.ChannelNumber = adc+1;
           if(adcVals[uplink-uplinkMin][adc]>0){
-            if (correctSim) c.AdcValue = adcVals[uplink-uplinkMin][adc] * 6./5.;
-            else c.AdcValue = adcVals[uplink-uplinkMin][adc];
+            //if (correctSim)
+            //  c.AdcValue = adcVals[uplink-uplinkMin][adc] * 6./5.;
+            //else
+              c.AdcValue = adcVals[uplink-uplinkMin][adc];
             c.AdcValue *= factor;
           }
           else

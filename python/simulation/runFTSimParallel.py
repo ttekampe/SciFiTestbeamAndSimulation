@@ -12,6 +12,7 @@ def nFinishedJobs(processes):
 parser = argparse.ArgumentParser(description='Plot cluster properties from data and simulation.')
 parser.add_argument('-f', '--file', type=str, nargs='+')
 parser.add_argument('-n', '--nCpu', type=int)
+parser.add_argument('-t', '--tag', type=str, default="")
 
 cfg = parser.parse_args()
 
@@ -33,6 +34,7 @@ try:
         [
             "python", script
             ,'-f' , f
+            ,'-t' , cfg.tag
         ]
         ,stdout=devnull
         ,stderr=devnull
