@@ -151,17 +151,7 @@ std::string getPositionFromFileName(std::string fileName){
 }
 
 
-<<<<<<< HEAD
-    TTree* inputTree;
-    if(c.simulation){
-      std::string tree("layer_11");
-      std::cout << "reading tree " << tree << "\n";
-      inputTree = dynamic_cast<TTree*>( inputFile.Get(tree.c_str()) );
-    }
-    else{
-      inputTree = dynamic_cast<TTree*>( inputFile.Get("rawData") );
-    }
-=======
+
 std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
   
   TFile inputFile(file2analyse.c_str(), "READ");
@@ -169,7 +159,6 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
     std::cout << "Could not open " << file2analyse << "\n";
     return std::make_pair(EDouble(0, 0), EDouble(0, 0));
   }
->>>>>>> cea67582b80b30b29f911f24edc1cad06dfd4d7c
 
   std::cout << "Analysis " << file2analyse << "\n";
 
@@ -197,7 +186,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
   std::map<std::string, std::vector<std::vector<Channel>*>* > data;
 
   std::vector<double> xPositions;
-  std::string offsetFileName = ( "/home/tobi/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data();
+  std::string offsetFileName = ( "/home/ttekampe/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data();
   bool produceOffsetFile{false};
   std::vector<double> xOffsets;
   std::vector<double> track_distances;
@@ -347,11 +336,11 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
       gauss.plotOn(plot);
       plot->Draw();
 
-      can_offset.SaveAs("/home/tobi/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".pdf") );
+      can_offset.SaveAs("/home/ttekampe/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".pdf") );
 
       fr->Print("v");
 
-      std::ofstream offsetFile( ("/home/tobi/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data() );
+      std::ofstream offsetFile( ("/home/ttekampe/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data() );
       offsetFile << rv_mean.getVal() << "\n";
       offsetFile.close();
 
@@ -424,7 +413,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
 
     ClusterMonitor clMonitor;
     clMonitor.WriteToNtuple(clCreators["simulation"], 
-      ("/home/tobi/SciFi/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data(),
+      ("/home/ttekampe/SciFi/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data(),
       features );
       for (auto& module : data){
        for(unsigned int entryIndex = 0; entryIndex < module.second->size(); ++entryIndex){
@@ -448,7 +437,7 @@ int main(int argc, char *argv[]){
     return 0;
   }
 
-  std::ofstream hitEffFile("/home/tobi/SciFi/results/hitEfficiency.txt");
+  std::ofstream hitEffFile("/home/ttekampe/SciFi/results/hitEfficiency.txt");
   hitEffFile << "position\tlightyield\tlightyieldErr\tefficiency\tefficiencyErr\n";
   
   std::pair<EDouble, EDouble> lightAndEff;

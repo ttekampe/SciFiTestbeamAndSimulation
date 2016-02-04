@@ -5,31 +5,33 @@ import os
 
 
 
-attScanPositions = ["305"
-                    ,"355"
-                    ,"455"
-                    ,"555"
-                    ,"655"
-                    ,"755"
-                    ,"855"
-                    ,"955"
-                    ,"1055"
-                    ,"1155"
-                    ,"1255"
-                    ,"1355"
-                    ,"1455"
-                    ,"1555"
-                    ,"1655"
-                    ,"1755"
-                    ,"1855"
-                    ,"1955"
-                    ,"2055"
-                    ,"2155"
-                    ,"2255"
-                    ]
+#attScanPositions = ["305"
+#                    ,"355"
+#                    ,"455"
+#                    ,"555"
+#                    ,"655"
+#                    ,"755"
+#                    ,"855"
+#                    ,"955"
+#                    ,"1055"
+#                    ,"1155"
+#                    ,"1255"
+#                    ,"1355"
+#                    ,"1455"
+#                    ,"1555"
+#                    ,"1655"
+#                    ,"1755"
+#                    ,"1855"
+#                    ,"1955"
+#                    ,"2055"
+#                    ,"2155"
+#                    ,"2255"
+#                    ]
+
+attScanPositions = ["a", "c"]
 
 # angle between beam and fibre mat in x
-angle = 0 #int(sys.argv[1])
+angle = 30 #int(sys.argv[1])
 
 local_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 

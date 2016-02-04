@@ -31,7 +31,7 @@ def resetSipmVals(sipimValPtr):
 
 LHCbApp().Simulation = True
 CondDB().Upgrade = True
-CondDB().addLayer(dbFile = "/home/tobi/eve/SciFi/FTv5/DDDB_FTv5_20150424_s20140204_lhcbv38r6.db", dbName="DDDB" )
+CondDB().addLayer(dbFile = "/home/ttekampe/SciFi/FTv5/DDDB_FTv5_20150424_s20140204_lhcbv38r6.db", dbName="DDDB" )
 
 
 LHCbApp().DDDBtag = "dddb-20150424"
@@ -160,7 +160,9 @@ hist.dump()
 #sipm chanel 0 - 127
 
 
-resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/sixLayers/attScan/"
+#resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/sixLayers/attScan/"
+
+resultPath = "/fhgfs/users/ttekampe/SciFi/toolFixed/"
 
 fileName = (cfg.file.split("/")[-1]).replace(".sim", "_{0}.root".format(cfg.tag))
 
