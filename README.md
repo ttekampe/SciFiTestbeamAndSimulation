@@ -15,6 +15,10 @@ where the possible programs are present in the main folder:
 produceCorrectedFile : produces a new file that contains the pedestal and gain corrected data
 clusterAnalysis : searches for clusters in a corrected data file
 ```
+To run the compiled program from the build folder, run
+```
+./bin/the_program
+```
 
 Available options for `produceCorrectedFile` are:
 ```
