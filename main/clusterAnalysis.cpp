@@ -5,6 +5,7 @@
 #include <map>
 #include <algorithm> 
 #include <fstream>
+#include <numeric>
 
 //from ROOT
 #include "TFile.h"
