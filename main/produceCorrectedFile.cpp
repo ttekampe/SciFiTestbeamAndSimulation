@@ -3,7 +3,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-
+#include <unistd.h>//cwd
 //from ROOT
 #include "TFile.h"
 #include "TTree.h"
@@ -13,8 +13,9 @@
 
 //from BOOST
 #include "boost/program_options.hpp"
-
 namespace po = boost::program_options;
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 struct config{
   std::string file2correct;
@@ -25,13 +26,19 @@ struct config{
   bool debug;
 };
 
+//AD 18-10-16. Check for existence of file. See http://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exist-using-standard-c-c11-c
+inline bool file_exists (const std::string& name) {
+  std::ifstream f(name.c_str());
+  return f.good();
+}
+
 int parseOptions(config &c, int argc, char *argv[]){
 
   // declare options
   po::options_description desc("Allowed options") ;
   desc.add_options()
     ("help", "show this help")
-    ("file2correct,f", po::value<std::string>(&c.file2correct), "test beam data file containing the led run")
+    ("file2correct,f", po::value<std::string>(&c.file2correct), "test beam data file")
     ("umax,u", po::value<unsigned int>(&c.uplinkMax)->default_value(4), "uplink number to start at [1, ... , 8]")
     ("umin,l", po::value<unsigned int>(&c.uplinkMin)->default_value(3), "uplink number to stop at [1, ... , 8]")
     ;
@@ -51,20 +58,28 @@ int parseOptions(config &c, int argc, char *argv[]){
 }
 
 int main(int argc, char *argv[]){
-
   config c;
   if (parseOptions(c, argc, argv)!= 0){
     std::cerr << "Can not parse options!" << std::endl;
     return 0;
   }
-
   if(c.uplinkMax<c.uplinkMin){
       std::cerr << "error in configuration: uplink min is bigger that uplink max\n";
       return  0;
   }
-
-  const unsigned int runNumber = runNumberFromFilename(c.file2correct);
-  calibrationRunNumbers calNum = lookUpCalibrationFiles(runNumber, "/data/testbeam/data/runNumbers.txt");
+  //fix issue with multiple underscores. AD 18-10-2016
+  const unsigned int runNumber = runNumberFromFilename(removePath(c.file2correct).Data());
+  //fix issue with search for runNumbers.txt. AD 18-10-2016
+  std::string exec_path = boost::filesystem::system_complete(argv[0]).string();
+  std::string path_head = exec_path.substr(0, exec_path.find("SciFiTestbeamAndSimulation"));
+  std::string location =  path_head+"SciFiTestbeamAndSimulation/RunNumbers/runNumbers.txt";
+  std::cout<<"looking for location"<<location<<std::endl;
+  //check if file exists
+  if(!file_exists(location)){
+    std::cout<<"Something terribly wrong with finding the run numbers"<<std::endl;
+    return 0;
+  }
+  calibrationRunNumbers calNum = lookUpCalibrationFiles(runNumber, location);
 
   std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark << "\tled: " << calNum.led << std::endl;
 
