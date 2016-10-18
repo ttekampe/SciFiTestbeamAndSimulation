@@ -24,8 +24,11 @@ struct config{
   unsigned int uplinkMin;
   unsigned int uplinkMax;
   bool debug;
+  std::string outputLocation;//AD 18-10-16
 };
-
+//todo. Change all output locations to the config struct val
+//todo. make directories if they don't exist already
+//todo. 
 //AD 18-10-16. Check for existence of file. See http://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exist-using-standard-c-c11-c
 inline bool file_exists (const std::string& name) {
   std::ifstream f(name.c_str());
@@ -37,17 +40,18 @@ int parseOptions(config &c, int argc, char *argv[]){
   // declare options
   po::options_description desc("Allowed options") ;
   desc.add_options()
-    ("help", "show this help")
+    ("help,h", "show this help")
     ("file2correct,f", po::value<std::string>(&c.file2correct), "test beam data file")
     ("umax,u", po::value<unsigned int>(&c.uplinkMax)->default_value(4), "uplink number to start at [1, ... , 8]")
     ("umin,l", po::value<unsigned int>(&c.uplinkMin)->default_value(3), "uplink number to stop at [1, ... , 8]")
+    ("outputlocation,o",po::value<std::string>(&c.outputLocation), "output location")
     ;
 
   // actually do the parsing
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
   po::notify(vm);
-
+  
   // show help and exit
   if ((argc == 0) || (vm.count("help"))) {
     std::cout << desc << "\n";
@@ -80,12 +84,15 @@ int main(int argc, char *argv[]){
     return 0;
   }
   calibrationRunNumbers calNum = lookUpCalibrationFiles(runNumber, location);
-
+  
   std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark << "\tled: " << calNum.led << std::endl;
 
-
-  c.darkFileName = "/data/testbeam/data/btsoftware_" + std::to_string(calNum.dark) + "_calib_dark_ntuple.root";
-  c.ledFileName = "/data/testbeam/data/btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
+  std::string data_path = boost::filesystem::system_complete(c.file2correct).string();
+  data_path = data_path.substr(0,data_path.find(removePath(c.file2correct).Data()));
+  std::cout << "Finding data at " << data_path << std::endl;
+  
+  c.darkFileName = data_path + "btsoftware_" + std::to_string(calNum.dark) + "_calib_dark_ntuple.root";
+  c.ledFileName =  data_path + "/btsoftware_" + std::to_string(calNum.led) + "_calib_led_ntuple.root";
 
   TFile darkFile(c.darkFileName.c_str(), "READ");
   TFile dataFile(c.file2correct.c_str(), "READ");
@@ -115,7 +122,7 @@ int main(int argc, char *argv[]){
   else std::cout << "found gain file." << std::endl;
   gainFile.close();
 
-  std::cout << "readinf gains" << std::endl;
+  std::cout << "reading gains" << std::endl;
   std::map<unsigned int, std::map<unsigned int, double>> gains = readGains(gainFileName.Data());
 
 
@@ -129,7 +136,7 @@ int main(int argc, char *argv[]){
   }
 
 
-  TString newFileName = "/data/testbeam/data/corrected/" + removePath(c.file2correct);
+  TString newFileName = "/corrected/" + removePath(c.file2correct);
   newFileName.ReplaceAll(".root", "_corrected.root");
 
 
