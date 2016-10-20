@@ -3,9 +3,10 @@
 #include <cmath>
 #include <iostream>
 #include <map>
-#include <algorithm> 
+#include <algorithm>
 #include <fstream>
 #include <numeric>
+#include <cstdlib>
 
 //from ROOT
 #include "TFile.h"
@@ -35,6 +36,7 @@
 
 //from BOOST
 #include "boost/program_options.hpp"
+#include "boost/filesystem.hpp"
 
 namespace po = boost::program_options;
 
@@ -44,36 +46,9 @@ struct config{
   bool simulation;
   std::string clusterAlg;
   std::string tag;
+  std::string outputDir;
 };
 
-void addClusterShapeToHist(const Cluster& cl, std::vector<std::vector<double> >& adcValuesRelativeToSeed){
-  int clusterSeed = cl.GetSeedChannelNumber();
-  for(const auto& chan : cl.GetRelatedChannels()){
-    unsigned int position = std::abs(int(chan.ChannelNumber) - clusterSeed);
-    if (cl.GetClusterSize() <= adcValuesRelativeToSeed.size()){
-      adcValuesRelativeToSeed.at(position).push_back(chan.AdcValue);
-    }
-  }
-}
-
-std::pair<double , double> getMean(std::vector<double> data){
-  if(data.empty()){
-    return std::make_pair(0., 0.);
-  }
-  double mean{0.};
-  for(const auto& entry : data){
-    mean += entry;
-  }
-  mean /= data.size();
-
-  double stdDev{0.};
-  for(const auto& entry : data){
-    stdDev += (mean - entry) * (mean - entry);
-  }
-  stdDev = std::sqrt(stdDev / (data.size() - 1.) );
-
-  return std::make_pair(mean, stdDev);
-}
 
 int parseOptions(config &c, int argc, char *argv[]){
 
@@ -86,6 +61,7 @@ int parseOptions(config &c, int argc, char *argv[]){
   // ("clusteralg,c", po::value<std::string>(&c.clusterAlg)->default_value("b"), "clustering algorithm: b for Boole or m for Maxs")
   ("tag,t", po::value<std::string>(&c.tag)->default_value(""), "tag that is added to the output file name")
   ("debug,d", po::bool_switch(&c.debug), "debug output")
+  ("odir,o", po::value<std::string>(&c.outputDir)->default_value(std::string(std::getenv("HOME")) + "SciFi"), "directory the output is written to")
   ;
 
   // actually do the parsing
@@ -94,7 +70,7 @@ int parseOptions(config &c, int argc, char *argv[]){
   po::notify(vm);
 
   // show help and exit
-  if ((argc == 0) || (vm.count("help"))) {
+  if ((argc == 1) || (vm.count("help"))) {
     std::cout << desc << "\n";
     return 1;
   }
@@ -106,16 +82,15 @@ std::string getPositionFromFileName(std::string fileName){
   std::string position;
   if(fileName.find("btsoftware") != std::string::npos){ // data
     std::map<std::string, std::string> runNumbersAndPositions;
-    //Pos Angle   Runnumber     Frac of events with 1 or more clusters
-    runNumbersAndPositions["1431786652"] =  "a";    
-    runNumbersAndPositions["1432091294"] =  "a";    
-    runNumbersAndPositions["1432264510"] =  "a";    
-    runNumbersAndPositions["1432350729"] =  "a";    
-    runNumbersAndPositions["1432341050"] =  "a";    
-    runNumbersAndPositions["1432169457"] =  "c";   
-    runNumbersAndPositions["1432089102"] =  "c";   
-    runNumbersAndPositions["1432187205"] =  "c";   
-    runNumbersAndPositions["1432358809"] =  "c";   
+    runNumbersAndPositions["1431786652"] =  "a";
+    runNumbersAndPositions["1432091294"] =  "a";
+    runNumbersAndPositions["1432264510"] =  "a";
+    runNumbersAndPositions["1432350729"] =  "a";
+    runNumbersAndPositions["1432341050"] =  "a";
+    runNumbersAndPositions["1432169457"] =  "c";
+    runNumbersAndPositions["1432089102"] =  "c";
+    runNumbersAndPositions["1432187205"] =  "c";
+    runNumbersAndPositions["1432358809"] =  "c";
 
     //AttScan
     runNumbersAndPositions["1431883436"] = "35.5";
@@ -151,10 +126,8 @@ std::string getPositionFromFileName(std::string fileName){
   return position;
 }
 
-
-
 std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
-  
+
   TFile inputFile(file2analyse.c_str(), "READ");
   if(!inputFile.IsOpen()){
     std::cout << "Could not open " << file2analyse << "\n";
@@ -187,7 +160,8 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
   std::map<std::string, std::vector<std::vector<Channel>*>* > data;
 
   std::vector<double> xPositions;
-  std::string offsetFileName = ( "/home/ttekampe/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data();
+  boost::filesystem::create_directories(c.outputDir + "/results/moduleOffset/");
+  std::string offsetFileName = ( c.outputDir + "/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data();
   bool produceOffsetFile{false};
   std::vector<double> xOffsets;
   std::vector<double> track_distances;
@@ -241,7 +215,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
   if(c.simulation){
     for (const auto& event : *data["simulation"]){
 
-      // if(c.clusterAlg == "b") 
+      // if(c.clusterAlg == "b")
       clCreators["simulation"].FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
       // if(c.clusterAlg == "m") clCreators["simulation"].FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
       if (currentNumberOfClusters == clCreators["simulation"].getNumberOfClusters()) ++missedEvents;
@@ -254,7 +228,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
       clustersInModule["cern"] = clCreators["cern"].FindClustersInEventBoole(*(data["cern"]->at(i)), 1.5, 2.5, 4.0, 100, false);
       clustersInModule["slayer"] = clCreators["slayer"].FindClustersInEventBoole(*(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
       clustersInModule["HD2"] = clCreators["HD2"].FindClustersInEventBoole(*(data["HD2"]->at(i)), 1.5, 2.5, 4.0, 100, false);
-      
+
       if(  clustersInModule["cern"].size() == 1
         && clustersInModule["slayer"].size() == 1
         && clustersInModule["HD2"].size() == 1
@@ -327,7 +301,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
       }
       dataset_xoffset.Print();
       RooRealVar rv_mean("rv_mean", "", mean, mean - 100 , mean + 100);
-      RooRealVar rv_sigma("rv_sigma", "", 50, 0,  100);  
+      RooRealVar rv_sigma("rv_sigma", "", 50, 0,  100);
       RooGaussian gauss("gauss", "", rv_xoffset, rv_mean, rv_sigma);
 
       RooFitResult* fr = gauss.fitTo(dataset_xoffset, RooFit::Save(true), RooFit::Minimizer("Minuit2", "minimize"));
@@ -337,11 +311,12 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
       gauss.plotOn(plot);
       plot->Draw();
 
-      can_offset.SaveAs("/home/ttekampe/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".pdf") );
+      boost::filesystem::create_directories(c.outputDir + "/results/moduleOffset/");
+      can_offset.SaveAs(c.outputDir + "/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".pdf") );
 
       fr->Print("v");
 
-      std::ofstream offsetFile( ("/home/ttekampe/SciFi/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data() );
+      std::ofstream offsetFile( (c.outputDir + "/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data() );
       offsetFile << rv_mean.getVal() << "\n";
       offsetFile.close();
 
@@ -413,8 +388,9 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
     features["distance_from_track"] = track_distances;
 
     ClusterMonitor clMonitor;
-    clMonitor.WriteToNtuple(clCreators["simulation"], 
-      ("/home/ttekampe/SciFi/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data(),
+    boost::filesystem::create_directories(c.outputDir + "/results/clusters/");
+    clMonitor.WriteToNtuple(clCreators["simulation"],
+      (c.outputDir + "/results/clusters/" + removePath(file2analyse).ReplaceAll(".root", "_clusterAnalyis" + c.tag +".root")).Data(),
       features );
       for (auto& module : data){
        for(unsigned int entryIndex = 0; entryIndex < module.second->size(); ++entryIndex){
@@ -438,9 +414,9 @@ int main(int argc, char *argv[]){
     return 0;
   }
 
-  std::ofstream hitEffFile("/home/ttekampe/SciFi/results/hitEfficiency.txt");
+  std::ofstream hitEffFile(c.outputDir +  "/results/hitEfficiency.txt");
   hitEffFile << "position\tlightyield\tlightyieldErr\tefficiency\tefficiencyErr\n";
-  
+
   std::pair<EDouble, EDouble> lightAndEff;
 
   for(const auto& file2analyse : c.files2analyse){
