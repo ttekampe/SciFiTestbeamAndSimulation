@@ -35,6 +35,27 @@ inline bool file_exists (const std::string& name) {
   return f.good();
 }
 
+//make folders in output location if they don't exist. AD 20-10-2016
+void make_output_folders(const std::string& outputlocation){
+  const std::string locations_needed[] = {"/results/gains","/corrected"};
+  for(auto loc : locations_needed){    
+    std::string place = outputlocation+loc;
+    std::string comm = "mkdir -p "+place;//create parent directory too.
+    std::cout<<"looking for "<<place<<std::endl;
+    if(!(boost::filesystem::exists(place))){
+      std::cout << "Doesn't Exists" << std::endl;
+      try{
+	std::system(comm.c_str());
+      }
+      catch(const std::system_error& e){
+	std::cout << "Caught system_error with code " << e.code() 
+                  << " meaning " << e.what() << '\n';
+      }
+    }
+  }
+}
+
+
 int parseOptions(config &c, int argc, char *argv[]){
 
   // declare options
@@ -51,9 +72,8 @@ int parseOptions(config &c, int argc, char *argv[]){
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
   po::notify(vm);
-  
   // show help and exit
-  if ((argc == 0) || (vm.count("help"))) {
+  if ((argc == 1) || (vm.count("help"))) {//change to 1, argc ==1 means you only passed the file
     std::cout << desc << "\n";
     return 1;
   }
@@ -71,10 +91,20 @@ int main(int argc, char *argv[]){
       std::cerr << "error in configuration: uplink min is bigger that uplink max\n";
       return  0;
   }
-  //fix issue with multiple underscores. AD 18-10-2016
+  //set default output location as ./ AD:20-10-2016
+  if(c.outputLocation.empty()){
+    std::string out_path = boost::filesystem::absolute(c.file2correct).string();
+    out_path = out_path.substr(0,out_path.find(removePath(c.file2correct).Data()));
+    std::cout << "No location given. Setting to " << out_path << std::endl;
+    c.outputLocation = out_path;//get the full path
+  }
+  //make file structure. AD-20-10-2016
+  make_output_folders(c.outputLocation);
+
+  //fix issue with possible multiple underscores. AD 18-10-2016
   const unsigned int runNumber = runNumberFromFilename(removePath(c.file2correct).Data());
   //fix issue with search for runNumbers.txt. AD 18-10-2016
-  std::string exec_path = boost::filesystem::system_complete(argv[0]).string();
+  std::string exec_path = boost::filesystem::absolute(argv[0]).string();
   std::string path_head = exec_path.substr(0, exec_path.find("SciFiTestbeamAndSimulation"));
   std::string location =  path_head+"SciFiTestbeamAndSimulation/RunNumbers/runNumbers.txt";
   std::cout<<"looking for location"<<location<<std::endl;
@@ -110,14 +140,14 @@ int main(int argc, char *argv[]){
   TString gainFileName = c.ledFileName;
   gainFileName = removePath(gainFileName);
   gainFileName.ReplaceAll(".root", "_gain.txt");
-  gainFileName = "/home/tobi/SciFi/results/gains/" + gainFileName;
+  gainFileName = c.outputLocation + "/results/gains/" + gainFileName;
 
 
   std::cout << " looking for file " << gainFileName << std::endl;
   std::ifstream gainFile(gainFileName);
   if(!gainFile){
     std::cout << "could not find gainfile -> producing gains" << std::endl;
-    produceGains(ledTree, c.uplinkMin, c.uplinkMax, 1, 128, 4, c.ledFileName, "/home/tobi/SciFi/results/gains/");
+    produceGains(ledTree, c.uplinkMin, c.uplinkMax, 1, 128, 4, c.ledFileName, c.outputLocation + "/results/gains/");
   }
   else std::cout << "found gain file." << std::endl;
   gainFile.close();
@@ -136,7 +166,7 @@ int main(int argc, char *argv[]){
   }
 
 
-  TString newFileName = "/corrected/" + removePath(c.file2correct);
+  TString newFileName =   c.outputLocation + "/corrected/" + removePath(c.file2correct);
   newFileName.ReplaceAll(".root", "_corrected.root");
 
 
