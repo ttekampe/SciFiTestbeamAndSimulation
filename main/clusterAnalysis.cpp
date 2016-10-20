@@ -79,6 +79,10 @@ int parseOptions(config &c, int argc, char *argv[]){
 }
 
 std::string getPositionFromFileName(std::string fileName){
+  // maps testbeam run numbers to the position in testbeam jargon:
+  // a: beam hits module close to mirror, b: middle, c: close to scipm
+  // in the case of the attenuation scan, the measured distance is returned
+  // see https://twiki.cern.ch/twiki/bin/view/LHCb/SciFiTrackerTestBeam2015
   std::string position;
   if(fileName.find("btsoftware") != std::string::npos){ // data
     std::map<std::string, std::string> runNumbersAndPositions;
@@ -126,7 +130,7 @@ std::string getPositionFromFileName(std::string fileName){
   return position;
 }
 
-std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
+std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c, bool recursive_call = false){
 
   TFile inputFile(file2analyse.c_str(), "READ");
   if(!inputFile.IsOpen()){
@@ -159,6 +163,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
 
   std::map<std::string, std::vector<std::vector<Channel>*>* > data;
 
+  // offsets between the modules perpendicular to the beam
   std::vector<double> xPositions;
   boost::filesystem::create_directories(c.outputDir + "/results/moduleOffset/");
   std::string offsetFileName = ( c.outputDir + "/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data();
@@ -166,10 +171,18 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
   std::vector<double> xOffsets;
   std::vector<double> track_distances;
 
+  // for data the offset needs to be known to measure the distance
+  // between the "track" and a found cluster
   if(!c.simulation){
     std::cout << "Checking for offsetFile...\n";
      std::ifstream offsetFile(offsetFileName);
     if(!offsetFile){
+      if(recursive_call){
+        std::cerr << "Already runnig a second time, still no offset file\n"
+                  << "Maybe you do not have write permissions at your output dir\n"
+                  << "Giving up";
+        throw;
+      }
       std::cout << "Offsetfile does not exists yet -> producing...\n";
       produceOffsetFile = true;
     }
@@ -183,7 +196,8 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
     }
   }
 
-  std::vector<double> zPositions = {0., 247.0*1000, 469.0*1000}; // HD2, Slayer, CERN
+  // distance between modules in beam direction in the order HD2, Slayer, CERN
+  std::vector<double> zPositions = {0., 247.0*1000, 469.0*1000};
 
   if(c.simulation){
     data["simulation"] = parseCorrectedRootTree(inputTree, 1, 4, 128);
@@ -201,7 +215,8 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
     clCreators["HD2"] = ClusterCreator();
   }
 
-  clCreators["simulation"] = ClusterCreator(); // in the case of data this one stores the mathed clusters
+  // in the case of data this one stores the matched clusters
+  clCreators["simulation"] = ClusterCreator();
 
   std::map<std::string, std::vector<Cluster*>> clustersInModule;
   clustersInModule["cern"];
@@ -214,13 +229,9 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
   double foundEvents{0};
   if(c.simulation){
     for (const auto& event : *data["simulation"]){
-
-      // if(c.clusterAlg == "b")
       clCreators["simulation"].FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
-      // if(c.clusterAlg == "m") clCreators["simulation"].FindClustersInEventMax(*event, 1.5, 2.5, 4.0);
       if (currentNumberOfClusters == clCreators["simulation"].getNumberOfClusters()) ++missedEvents;
       currentNumberOfClusters = clCreators["simulation"].getNumberOfClusters();
-                                                      //neighbor, seed, sum, maxsize, debug in simu 3, 5, 8
     }
   }
   else{
@@ -232,28 +243,32 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
       if(  clustersInModule["cern"].size() == 1
         && clustersInModule["slayer"].size() == 1
         && clustersInModule["HD2"].size() == 1
-        ){
+      ){ // if there is a cluster in all modules, keep the one in the slayer module
 
+        // why am I calling this again? Doesnt matter it's fast
         clustersInModule["slayer"] = clCreators["simulation"].FindClustersInEventBoole(*(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
 
-
+        // get the x positions of the clusters to do some primitive tracking
         xPositions = {
           clustersInModule["HD2"][0]->GetChargeWeightedMean() * 250.,
           clustersInModule["slayer"][0]->GetChargeWeightedMean() * 250.,
           clustersInModule["cern"][0]->GetChargeWeightedMean() * 250.
-
         };
 
+        // just calculate the equation for a strright line through the cluster
+        // positions in the HD2 and the CERN modules
         double dx = xPositions[2] - xPositions[0];
         double dz = zPositions[2] - zPositions[0];
 
         double slope =  dx / dz;
         double constant = xPositions[0];
 
-        //std::cout << "Track is " << constant << " + " << slope << " * x\n";
 
+        // calculate the position of the track at the slayer module
         double trackAtSlayer = constant + slope * zPositions[1];
-        //std::cout << "Track at slayer should be " << trackAtSlayer << " and is " << xPositions[1] << "\n";
+        // store the (not yet calibrated) offset in the vector for the offset
+        // file or if it already exists store the distance between the track
+        // and the cluster
         if(produceOffsetFile) xOffsets.push_back(trackAtSlayer - xPositions[1]);
         else{
           track_distances.push_back(trackAtSlayer - xPositions[1] - xOffsets[0]);
@@ -262,13 +277,12 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
 
       }
 
-      //std::cout << "\n";
-      if(!clustersInModule["cern"].empty() && !clustersInModule["HD2"].empty()) ++missedEvents;
-
-      if(!clustersInModule["cern"].empty() && !clustersInModule["slayer"].empty() && !clustersInModule["HD2"].empty()){ // if cluster in all modules store the slayer one for analysis
-        //clCreators["simulation"].FindClustersInEventBoole((*data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+      //count found and missed events for the efficiency calculation
+      if(!clustersInModule["cern"].empty() && !clustersInModule["HD2"].empty()){
+        ++missedEvents;
+      }
+      if(!clustersInModule["cern"].empty() && !clustersInModule["slayer"].empty() && !clustersInModule["HD2"].empty()){
         ++foundEvents;
-
       }
 
     }
@@ -293,9 +307,8 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
 
       RooDataSet dataset_xoffset("dataset_xoffset", "", RooArgSet(rv_xoffset));
       for(const auto xoffset : xOffsets){
+        // veto absurd offset values (noise / wrongly associated clusters)
         if(xoffset > mean + 300 || xoffset < mean - 300) continue;
-
-        //std::cout << "Adding " << xoffset << " to offset dataset\n";
         rv_xoffset.setVal(xoffset);
         dataset_xoffset.add(RooArgSet(rv_xoffset));
       }
@@ -317,10 +330,11 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
       fr->Print("v");
 
       std::ofstream offsetFile( (c.outputDir + "/results/moduleOffset/" + removePath(file2analyse).ReplaceAll(".root", ".txt") ).Data() );
+      // store the found offset in the file
       offsetFile << rv_mean.getVal() << "\n";
       offsetFile.close();
 
-      // restart and run with offsets
+      // restart the procedure, this time the offsetfile will exist
       std::map<std::string, std::vector<std::vector<Channel>*>* > data;
       for (auto& module : data){
         for(unsigned int entryIndex = 0; entryIndex < module.second->size(); ++entryIndex){
@@ -330,7 +344,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c){
 
       delete inputTree;
       inputFile.Close();
-      return analyse(file2analyse, c);
+      return analyse(file2analyse, c, true);
     }
 
     double meanLightYield{0};
