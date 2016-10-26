@@ -61,7 +61,7 @@ int parseOptions(config &c, int argc, char *argv[]){
   // ("clusteralg,c", po::value<std::string>(&c.clusterAlg)->default_value("b"), "clustering algorithm: b for Boole or m for Maxs")
   ("tag,t", po::value<std::string>(&c.tag)->default_value(""), "tag that is added to the output file name")
   ("debug,d", po::bool_switch(&c.debug), "debug output")
-  ("odir,o", po::value<std::string>(&c.outputDir)->default_value(std::string(std::getenv("HOME")) + "SciFi"), "directory the output is written to")
+  ("odir,o", po::value<std::string>(&c.outputDir)->default_value(std::string(std::getenv("HOME")) + "/SciFi"), "directory the output is written to")
   ;
 
   // actually do the parsing
