@@ -19,10 +19,6 @@ from LinkerInstances.eventassoc import *
 import ROOT as R
 
 
-#from Configurables import Boole
-#Boole().DataType = 'Upgrade'
-#Boole().DatasetName = (cfg.file.split("/")[-1]).replace(".sim", cfg.tag)
-
 def resetSipmVals(sipimValPtr):
   for layer in sipimValPtr:
     for adcID in layer:
@@ -70,8 +66,8 @@ MCFTDigitCreator().Force2bitADC = 0
 
 from Configurables import MCFTAttenuationTool
 att = MCFTAttenuationTool()
-#att.ShortAttenuationLength = 491.7 # 200mm
-#att.LongAttenuationLength = 3526. # 4700mm
+att.ShortAttenuationLength = 491.7 # 200mm
+att.LongAttenuationLength = 3526. # 4700mm
 att.FractionShort = 0.234 # 0.18
 
 #make sure I always hit uirradiated zone
@@ -84,18 +80,24 @@ MCFTDepositCreator().SpillVector = ["/"]
 MCFTDepositCreator().SpillTimes = [0.0]
 MCFTDepositCreator().UseAttenuation = True
 MCFTDepositCreator().SimulateNoise = False
+MCFTDepositCreator().UseDepositPositionTool = True
+
+from Configurables import MCFTDepositPositionTool
+depo_tool = MCFTDepositPositionTool()
+depo_tool.UseNoLightSharing = False
+depo_tool.UseOldLightSharing = False
+
+depo_tool.WidthOfPhotonDistribution = 0.125
+#depo_tool.NumOfNeighbouringChannels = 
+#depo_tool.MinEnergyForSignalDeposit = 
+
+MCFTDepositCreator().addTool(depo_tool)
 
 #MCFTDigitCreator().SimulateNoise = False
 
-
-
 #MCFTDepositCreator().AttenuationToolName = "Julians nice tool"
 
-
-
 tof = 25.4175840541
-
-
 MCFTDigitCreator().IntegrationOffset = [26 - tof, 28 - tof, 30 - tof]
 
 #MCFTDigitCreator().SimulateNoise = False
@@ -162,7 +164,8 @@ hist.dump()
 
 #resultPath = "/fhgfs/users/ttekampe/SciFi/testbeamData/simulated/boole/sixLayers/attScan/"
 
-resultPath = "/fhgfs/users/ttekampe/SciFi/toolFixed/"
+#resultPath = "/fhgfs/users/ttekampe/SciFi/attScanNewTool/"
+resultPath = "/home/ttekampe/test/"
 
 fileName = (cfg.file.split("/")[-1]).replace(".sim", "_{0}.root".format(cfg.tag))
 

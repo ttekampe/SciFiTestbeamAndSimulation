@@ -54,7 +54,7 @@ int main(){
   std::vector<double> efficienciesErr;
 
   for(const auto& f : files){
-    std::string fname = "/data/testbeam/simulation/attScan/testbeam_simulation_position_" + f + "_at_0deg.root";
+    std::string fname = "/fhgfs/users/ttekampe/SciFi/attScanNewTool/testbeam_simulation_position_" + f + "_at_0deg_newTool_attScan.root";
     TFile inputFile(fname.c_str(), "READ");
     TTree* inputTree;
     inputTree = dynamic_cast<TTree*>( inputFile.Get("layer_0") );
@@ -66,12 +66,12 @@ int main(){
     }
 
     std::vector<std::vector<Channel>*>* data;
-    data = parseCorrectedRootTree(inputTree, 1, 4, 128, true);
+    data = parseCorrectedRootTree(inputTree, 1, 4, 128);
 
 
 
     ClusterCreator clCreator;
-    int currentNumberOfClusters{0};
+    unsigned int currentNumberOfClusters{0};
     int missedEvents{0};
     for (const auto& event : *data){
       clCreator.FindClustersInEventBoole(*event, 1.5, 2.5, 4.0, 100, false);
@@ -84,10 +84,11 @@ int main(){
     double meanLightYield{0};
     double skippedEvents{0};
     for(const auto& cl : clCreator.getClusters()){
-      if(cl->GetClusterSize()>5 || cl->GetChargeWeightedMean()> 97. || cl->GetChargeWeightedMean()< 92.){
-        ++skippedEvents;
-        continue;
-      }
+      // if(cl->GetClusterSize()>5 || cl->GetChargeWeightedMean()> 36. || cl->GetChargeWeightedMean()< 30.){
+      //   ++skippedEvents;
+      //   // std::cout << cl->GetChargeWeightedMean() << "\n";
+      //   continue;
+      // }
       meanLightYield += cl->GetSumOfAdcValues();
     }
     meanLightYield /= (double)clCreator.getNumberOfClusters();
@@ -105,7 +106,7 @@ int main(){
     lightyieldsErr.push_back(stdDevLightYield/TMath::Sqrt((double)clCreator.getNumberOfClusters()));
 
 
-    double nEvents = inputTree->GetEntriesFast() - skippedEvents;
+    double nEvents = inputTree->GetEntriesFast();// - skippedEvents;
     std::cout << "Found " << clCreator.getNumberOfClusters() << " clusters in " << nEvents << " events!\n";
     std::cout << "Missed " << missedEvents << " events\n";
     double event2OneOrMoreClusterEff = 1. - (double)missedEvents/nEvents;
@@ -117,7 +118,7 @@ int main(){
   }
 
   for(const auto& f : files){
-    std::string fname = "/data/testbeam/simulation/attScan/testbeam_simulation_position_" + f + "_at_0deg.root";
+    std::string fname = "/fhgfs/users/ttekampe/SciFi/attScanNewTool/testbeam_simulation_position_" + f + "_at_0deg_newTool_attScan.root";
     TFile inputFile(fname.c_str(), "READ");
     TTree* inputTree;
     inputTree = dynamic_cast<TTree*>( inputFile.Get("layer_0") );
@@ -129,7 +130,12 @@ int main(){
     }
 
     std::vector<std::vector<Channel>*>* data;
-    data = parseCorrectedRootTree(inputTree, 1, 4, 128, true, 0.45);
+    data = parseCorrectedRootTree(inputTree,
+                                  1,
+                                  4,
+                                  128,
+                                  0.8
+                                  );
 
 
 
@@ -184,7 +190,7 @@ int main(){
   TGraphErrors graph(lightyields.size(),lightyields.data(), efficiencies.data(), lightyieldsErr.data(), efficienciesErr.data());
   //TGraphErrors graph(lightyields.size(),lightyields.data(), efficiencies.data(), zeroes.data(), efficienciesErr.data());
 
-  TF1* func = new TF1("func", "[0]*(1-[1]*exp(-x/[2]))", 0, 22);
+  TF1* func = new TF1("func", "[0]*(1-[1]*exp(-x/[2]))", 0, 25);
   func->SetParameter(0,0.9);
   func->SetParLimits(0,0.,1.);
 
@@ -194,12 +200,13 @@ int main(){
   func->SetParameter(2,2.7);
   func->SetParLimits(2,1,20);
 
-  TF1* romansFunc = new TF1("romansFunc", "0.99*(1-3.4964*exp(-x/2.7035))", 0, 22);
+  TF1* romansFunc = new TF1("romansFunc", "0.99*(1-3.4964*exp(-x/2.7035))", 0, 25);
   romansFunc->SetLineColor(kRed);
 
   graph.Fit(func, "R");
 
   TCanvas can;
+  graph.GetYaxis()->SetRangeUser(0.98, 1.);
   graph.Draw("ALP");
   graph.GetXaxis()->SetTitle("Light yield in p.e.");
   graph.GetYaxis()->SetTitle("#varepsilon");
@@ -208,7 +215,7 @@ int main(){
 
   romansFunc->Draw("same");
 
-  can.SaveAs("lightyieldVsEff_artReduced.pdf");
+  can.SaveAs("lightyieldVsEff_newTool.pdf");
 
   delete  func;
 

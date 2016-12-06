@@ -170,6 +170,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c, b
   bool produceOffsetFile{false};
   std::vector<double> xOffsets;
   std::vector<double> track_distances;
+  std::vector<double> track_dxdz;
 
   // for data the offset needs to be known to measure the distance
   // between the "track" and a found cluster
@@ -272,6 +273,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c, b
         if(produceOffsetFile) xOffsets.push_back(trackAtSlayer - xPositions[1]);
         else{
           track_distances.push_back(trackAtSlayer - xPositions[1] - xOffsets[0]);
+          track_dxdz.push_back(slope);
         }
 
 
@@ -400,6 +402,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config& c, b
 
     std::map<std::string, std::vector<double>> features;
     features["distance_from_track"] = track_distances;
+    features["track_dxdz"] = track_dxdz;
 
     ClusterMonitor clMonitor;
     boost::filesystem::create_directories(c.outputDir + "/results/clusters/");
