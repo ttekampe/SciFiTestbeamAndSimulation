@@ -387,7 +387,7 @@ unsigned int runNumberFromFilename(std::string filename) {
   // }
   filename = removePath(filename);
   // In May15 testbeam, unixtime was used as runNumber and contained 10 digits
-  std::regex re("\d{10,}");
+  std::regex re("\\d{10,}");
   std::smatch match;
   std::regex_search(filename, match, re);
   return std::stoi(match[0]);
