@@ -15,6 +15,7 @@ endif()
 project(SciFiTestbeamAndSimulation)
 set(PROJECT_VERSION 0.0.0.0)
 set(PROJECT_BRIEF "\"No description\"")
+
 # Enable/disable testing
 option(TESTS_ENABLED "Enable automatic tests" OFF)
 # Enable/disable test coverage
