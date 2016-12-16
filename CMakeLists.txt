@@ -42,7 +42,7 @@ elseif(COMPILER_SUPPORTS_CXX11)
 # elseif(COMPILER_SUPPORTS_CXX0X)
 #     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 else()
-    message(FATAL_ERROR "Compiler does not support C++11")
+    message(FATAL_ERROR "Compiler does neither support C++14 nor C++11")
 endif()
 
 
