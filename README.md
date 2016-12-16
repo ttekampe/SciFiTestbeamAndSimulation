@@ -5,7 +5,10 @@ mkdir build
 cd build
 cmake ..
 ```
-
+on lxplus you need to specify the location of the compiler by
+```
+cmake .. -DCMAKE_C_COMPILER=/afs/cern.ch/sw/lcg/releases/LCG_84/gcc/4.9.3/x86_64-slc6/bin/gcc -DCMAKE_CXX_COMPILER=/afs/cern.ch/sw/lcg/releases/LCG_84/gcc/4.9.3/x86_64-slc6/bin/g++
+```
 Then you can run
 ```
 make <the program I want to compile>
