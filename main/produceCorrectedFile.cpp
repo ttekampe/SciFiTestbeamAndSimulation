@@ -5,6 +5,7 @@
 #include <string>
 #include <system_error>
 #include <unistd.h> //cwd
+
 // from ROOT
 #include "TFile.h"
 #include "TTree.h"
@@ -17,6 +18,7 @@
 namespace po = boost::program_options;
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+namespace fs = boost::filesystem;
 
 struct config {
   std::string file2correct;
@@ -44,7 +46,7 @@ void make_output_folders(const std::string &outputlocation) {
     std::string place = outputlocation + loc;
     std::string comm = "mkdir -p " + place; // create parent directory too.
     std::cout << "looking for " << place << std::endl;
-    if (!(boost::filesystem::exists(place))) {
+    if (!(fs::exists(place))) {
       std::cout << "Doesn't Exists" << std::endl;
       try {
         std::system(comm.c_str());
@@ -98,7 +100,9 @@ int main(int argc, char *argv[]) {
   }
   // set default output location as ./ AD:20-10-2016
   if (c.outputLocation.empty()) {
-    std::string out_path = boost::filesystem::absolute(c.file2correct).string();
+    // std::string out_path = fs::absolute(c.file2correct).string();
+    fs::path rel_out_path(c.file2correct);
+    std::string out_path = fs::complete(rel_out_path).string();
     out_path =
         out_path.substr(0, out_path.find(removePath(c.file2correct).Data()));
     std::cout << "No location given. Setting to " << out_path << std::endl;
@@ -111,7 +115,11 @@ int main(int argc, char *argv[]) {
   const unsigned int runNumber =
       runNumberFromFilename(removePath(c.file2correct).Data());
   // fix issue with search for runNumbers.txt. AD 18-10-2016
-  std::string exec_path = boost::filesystem::absolute(argv[0]).string();
+  // std::string exec_path = fs::absolute(argv[0]).string();
+
+  fs::path p(argv[0]);
+  std::string exec_path = fs::complete(p).string(); // complete == absolute
+
   std::string path_head =
       exec_path.substr(0, exec_path.find("SciFiTestbeamAndSimulation"));
   std::string location =
@@ -128,8 +136,7 @@ int main(int argc, char *argv[]) {
   std::cout << "Run number: " << runNumber << "\tdark calib: " << calNum.dark
             << "\tled: " << calNum.led << std::endl;
 
-  std::string data_path =
-      boost::filesystem::system_complete(c.file2correct).string();
+  std::string data_path = fs::system_complete(c.file2correct).string();
   data_path =
       data_path.substr(0, data_path.find(removePath(c.file2correct).Data()));
   std::cout << "Finding data at " << data_path << std::endl;

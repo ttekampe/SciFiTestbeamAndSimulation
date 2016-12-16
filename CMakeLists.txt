@@ -1,11 +1,20 @@
 cmake_minimum_required(VERSION 2.8)
 
+SITE_NAME(HOST)
+message("Running on " ${HOST})
+
+if(HOST MATCHES "lxplus")
+  message(STATUS "Setting boost path and compiler for lxplus")
+  set(CMAKE_C_COMPILER "/afs/cern.ch/sw/lcg/releases/LCG_84/gcc/4.9.3/x86_64-slc6/bin/gcc")
+  set(CMAKE_CXX_COMPILER "/afs/cern.ch/sw/lcg/releases/LCG_84/gcc/4.9.3/x86_64-slc6/bin/g++")
+  # set(BOOST_ROOT "/afs/cern.ch/sw/lcg/external/Boost/1.53.0_python2.7/x86_64-slc6-gcc48-opt")
+  # set(BOOST_INCLUDE_DIRS "${BOOST_ROOT}/include")
+  # set(BOOST_LIBRARY_DIRS "${BOOST_ROOT}/lib")
+endif()
+
 project(SciFiTestbeamAndSimulation)
 set(PROJECT_VERSION 0.0.0.0)
 set(PROJECT_BRIEF "\"No description\"")
-
-
-
 # Enable/disable testing
 option(TESTS_ENABLED "Enable automatic tests" OFF)
 # Enable/disable test coverage
@@ -54,16 +63,6 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-SITE_NAME(HOST)
-message("Running on " ${HOST})
-
-if(FIND HOST "lxplus")
-  message(STATUS "Setting boost path for lxplus")
-  set(BOOST_ROOT "/afs/cern.ch/sw/lcg/external/Boost/1.55.0_python2.7/x86_64-slc6-gcc47-opt")
-  set(BOOST_INCLUDE_DIRS "${BOOST_ROOT}/include")
-  set(BOOST_LIBRARY_DIRS "${BOOST_ROOT}/lib")
-endif()
-
 # Boost, a collection of useful C++ utilities and idioms
 find_package(Boost COMPONENTS
     program_options
@@ -94,24 +93,5 @@ set(ALL_LIBRARIES ${ROOT_LIBRARIES} ${ROOFIT_LIBRARIES} ${ADDITIONAL_LIBRARIES} 
 
 add_subdirectory(src)
 add_subdirectory(main)
-#add_subdirectory(energyCorrection)
 
-#MACRO(SUBDIRLIST result curdir)
-#  FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
-#  SET(dirlist "")
-#  FOREACH(child ${children})
-#    IF(IS_DIRECTORY ${curdir}/${child})
-#        LIST(APPEND dirlist ${child})
-#    ENDIF()
-#  ENDFOREACH()
-#  SET(${result} ${dirlist})
-#ENDMACRO()
-#
-#SUBDIRLIST(SUBDIRS ${MY_CURRENT_DIR})
-#
-#file(WRITE .clang_complete "")
-#
-#FOREACH(subdir ${SUBDIRS})
-#    file(APPEND .clang_complete "-I"${subdir})
-#    ADD_SUBDIRECTORY(${subdir})
-#ENDFOREACH()
+message(STATUS ${Boost_INCLUDE_DIR})
