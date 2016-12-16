@@ -4,7 +4,14 @@ project(SciFiTestbeamAndSimulation)
 set(PROJECT_VERSION 0.0.0.0)
 set(PROJECT_BRIEF "\"No description\"")
 
-
+SITE_NAME(HOST)
+message("Running on " ${HOST})
+if(FIND HOST "lxplus")
+  message(STATUS "Setting boost path for lxplus")
+  set(BOOST_ROOT "/afs/cern.ch/sw/lcg/external/Boost/1.55.0_python2.7/x86_64-slc6-gcc47-opt")
+  set(BOOST_INCLUDE_DIRS "${BOOST_ROOT}/include")
+  set(BOOST_LIBRARY_DIRS "${BOOST_ROOT}/lib")
+endif()
 
 # Enable/disable testing
 option(TESTS_ENABLED "Enable automatic tests" OFF)
@@ -52,16 +59,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "No build type selected, defaulting to Release")
     set(CMAKE_BUILD_TYPE "Release")
-endif()
-
-SITE_NAME(HOST)
-message("Running on " ${HOST})
-
-if(FIND HOST "lxplus")
-  message(STATUS "Setting boost path for lxplus")
-  set(BOOST_ROOT "/afs/cern.ch/sw/lcg/external/Boost/1.55.0_python2.7/x86_64-slc6-gcc47-opt")
-  set(BOOST_INCLUDE_DIRS "${BOOST_ROOT}/include")
-  set(BOOST_LIBRARY_DIRS "${BOOST_ROOT}/lib")
 endif()
 
 # Boost, a collection of useful C++ utilities and idioms
