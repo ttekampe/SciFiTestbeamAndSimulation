@@ -4,6 +4,7 @@
 #include <iostream>
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -375,10 +376,11 @@ lookUpCalibrationFiles(const unsigned int runNumber,
     if (currentRunNumber == runNumber) {
       rv.dark = currentDarkNumber;
       rv.led = currentLedNumber;
-      break;
+      return rv;
     }
   }
-  return rv;
+  throw std::runtime_error("calibration::lookUpCalibrationFiles: Unable to "
+                           "find a match in run number catalogue.");
 }
 
 unsigned int runNumberFromFilename(std::string filename) {
