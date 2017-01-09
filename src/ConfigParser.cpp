@@ -7,7 +7,6 @@ ConfigParser::ConfigParser(const std::string file_name) {
   std::ifstream cfg_file(file_name);
   std::map<std::string, std::string> current_conf;
   for (std::string line; std::getline(cfg_file, line);) {
-
     // ignore lines that are marked as comments
     if (line[0] == '#') {
       continue;
@@ -75,17 +74,3 @@ void ConfigParser::print() const {
     }
   }
 }
-
-// std::string ConfigParser::operator[][](const unsigned int idx,
-//                                        const std::string key) const {
-//   if (data[idx].find("f") == data.end()) {
-//     // the key does not exist in the map
-//     std::cerr << "ConfigParser::operator[] the key you are looking for
-//     does "
-//                  "not exist!\n";
-//     std::cerr << key << "\n";
-//     throw std::invalid_argument("Key is not present in config");
-//   } else {
-//     return data[idx].at(key);
-//   }
-// }
