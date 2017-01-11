@@ -1,7 +1,9 @@
 // from std
 #include <algorithm>
+#include <exception>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -26,9 +28,13 @@
 #include "TString.h"
 #include "TTree.h"
 
+// from BOOST
+#include "boost/filesystem.hpp"
+
 // from here
 #include "Calibration.h"
 #include "Cluster.h"
+#include "ConfigParser.h"
 #include "lhcbStyle.h"
 
 TString removePath(TString str) {
@@ -44,7 +50,6 @@ std::vector<Event *> *parseRootTree(
     unsigned int nAdcs,
     const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
     const std::map<unsigned int, std::map<unsigned int, double>> &gains) {
-
   std::vector<Event *> *dataVector =
       new std::vector<Event *>(dataTree->GetEntriesFast());
 
@@ -95,7 +100,6 @@ std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
                                              unsigned int uplinkMax,
                                              unsigned int nAdcs,
                                              double factor) {
-
   std::vector<Event *> *dataVector =
       new std::vector<Event *>(dataTree->GetEntriesFast());
 
@@ -256,10 +260,10 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       RooAbsReal *nll = pdf.createNLL(dataSet);
 
       RooMinuit minu(*nll);
-      minu.setStrategy(2); // ensure minimum true, errors correct
+      minu.setStrategy(2);  // ensure minimum true, errors correct
 
       // call MIGRAD -- minimises the likelihood
-      int migradStatusCode = minu.migrad(); // catch status code
+      int migradStatusCode = minu.migrad();  // catch status code
 
       // could also get an intermediary RooFitResult if you want
       //      RooFitResult *migradFitResult = m.save();
@@ -269,7 +273,7 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       int hesseStatusCode = minu.hesse();
 
       RooFitResult *fs =
-          minu.save(); // equivalent result to that from fitTo call
+          minu.save();  // equivalent result to that from fitTo call
 
       // check for success
       int covarianceQuality = fs->covQual();
@@ -278,7 +282,7 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
 
       bool isAGoodFit =
           ((hesseStatusCode == 0) && (migradStatusCode == 0) &&
-           (covarianceQuality == 3)); // && (minosStatusCode==0) );
+           (covarianceQuality == 3));  // && (minosStatusCode==0) );
 
       if (!isAGoodFit || gain.getError() == 0.0) {
         ++failedFits;
@@ -314,8 +318,8 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
             << std::endl;
 }
 
-std::map<unsigned int, std::map<unsigned int, double>>
-readGains(std::string fileName) {
+std::map<unsigned int, std::map<unsigned int, double>> readGains(
+    std::string fileName) {
   std::ifstream inputFile(fileName);
   std::string line;
   int uplinkNumber{0};
@@ -360,9 +364,8 @@ readGains(std::string fileName) {
   return gains;
 }
 
-calibrationRunNumbers
-lookUpCalibrationFiles(const unsigned int runNumber,
-                       const std::string catalogueFileName) {
+calibrationRunNumbers lookUpCalibrationFiles(
+    const unsigned int runNumber, const std::string catalogueFileName) {
   //  std::ifstream fileCatalogue("/data/testbeam/data/runNumbers.txt");
   std::ifstream fileCatalogue(catalogueFileName);
   unsigned int currentRunNumber = 0;
@@ -379,8 +382,9 @@ lookUpCalibrationFiles(const unsigned int runNumber,
       return rv;
     }
   }
-  throw std::runtime_error("calibration::lookUpCalibrationFiles: Unable to "
-                           "find a match in run number catalogue.");
+  throw std::runtime_error(
+      "calibration::lookUpCalibrationFiles: Unable to "
+      "find a match in run number catalogue.");
 }
 
 unsigned int runNumberFromFilename(std::string filename) {
@@ -395,9 +399,9 @@ unsigned int runNumberFromFilename(std::string filename) {
   return std::stoi(match[0]);
 }
 
-std::map<unsigned int, std::map<unsigned int, double>>
-getPedestals(const std::string fileName, const unsigned int uplinkMin,
-             const unsigned int uplinkMax, const unsigned int nAdcs) {
+std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
+    const std::string fileName, const unsigned int uplinkMin,
+    const unsigned int uplinkMax, const unsigned int nAdcs) {
   TFile pedestalFile(fileName.c_str(), "READ");
   if (!pedestalFile.IsOpen()) {
     std::cerr << "unable to open pedestal file " << fileName << std::endl;
@@ -458,7 +462,6 @@ void correctFile(
     const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
     const unsigned int uplinkMin, const unsigned int uplinkMax,
     const unsigned int nAdcs, TString newFileName) {
-
   //  newFileName = removePath(newFileName);
   //  TFile correctedFile(("/data/testbeam/data/corrected/" +
   //  newFileName).Data(), "RECREATE");
@@ -499,10 +502,10 @@ void correctFile(
           correctedAdcVals[uplink - uplinkMin][adc - 1] =
               (rawAdcVals[uplink - uplinkMin][adc - 1] -
                pedestals.at(uplink).at(adc)) /
-              gains.at(uplink).at(adc); // if gain is not 0
+              gains.at(uplink).at(adc);  // if gain is not 0
         else
           correctedAdcVals[uplink - uplinkMin][adc - 1] =
-              0.0; // gain fit failed!
+              0.0;  // gain fit failed!
         //      std::cout << correctedAdcVals[uplink - uplinkMin][adc-1] <<
         //      std::endl;
       }
@@ -520,3 +523,231 @@ void correctFile(
   delete[] correctedAdcVals;
   delete[] rawAdcVals;
 }
+
+bool get_x_offsets(std::string fileName,
+                   std::map<std::string, double> &xOffsets) {
+  std::ifstream offsetFile(fileName);
+  if (!offsetFile) {
+    return false;
+  } else {
+    std::string line;
+    double offset;
+    std::string name;
+    while (std::getline(offsetFile, line)) {
+      std::istringstream ss(line);
+      if (ss >> name >> offset) {
+        xOffsets[name] = offset;
+      } else {
+        std::cerr
+            << "Cannot interpret following line in x_offset file:\n"
+            << line << "\n"
+            << "Lines should contain the fibremat name, a white space and "
+               "then the value";
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+std::string replace(std::string str, const std::string &from,
+                    const std::string &to) {
+  size_t start_pos = str.find(from);
+  if (start_pos != std::string::npos) {
+    str.replace(start_pos, from.length(), to);
+  }
+  return str;
+}
+
+// std::map<std::string, double> align_x_coordinates(
+//     std::map<std::string, double> zPositions,
+//     std::map<std::string, std::vector<Cluster *>> clusters,
+//     std::vector<FibMatInfo> fibreMats, std::string offsetFileName) {
+//   std::map<std::string, std::vector<double>> trackDistances;
+//   std::string this_mat;
+//   std::vector<std::string> other_mats;
+//   std::vector<Point> points;
+//   Line current_track;
+//   if (zPositions.size() < 3) {
+//     std::cerr
+//         << "Error in calc_x_offset: not enaugh fibre mats to find a track\n"
+//         << "Found " << zPositions.size() << ", need at least 3\n";
+//     throw std::runtime_error("Not enaugh fibre mats to do tracking");
+//   }
+//   // fit a line using clusters in all fibre mats
+//   // except the one currectly looking at
+//   for (const auto &mat : fibreMats) {
+//     this_mat = mat.name;
+//     other_mats.clear();
+//     for (const auto &mat2 : fibreMats) {
+//       if (mat2.name == this_mat) {
+//         continue;
+//       }
+//       other_mats.push_back(mat2.name);
+//     }
+//     for (unsigned int i = 0; i < clusters[mat.name].size(); ++i) {
+//       points.clear();
+//       for (const auto &other_mat : other_mats) {
+//         points.push_back(
+//             {zPositions[other_mat],
+//              clusters[other_mat][i]->GetChargeWeightedMean() * 250.});
+//       }
+//       current_track.fitPoints(points);
+//       trackDistances[mat.name].push_back(
+//           current_track.getYforX(zPositions[mat.name]) -
+//           (clusters[mat.name][i]->GetChargeWeightedMean() * 250.));
+//     }
+//   }
+//   // fit gaussian to offsets and store the found offset in a file
+//   boost::filesystem::path p(offsetFileName);
+//   boost::filesystem::create_directories(p.parent_path());
+//   std::ofstream offsetFile(offsetFileName);
+//   std::map<std::string, double> offsets;
+//   for (const auto &mat : fibreMats) {
+//     TCanvas can_offset;
+//     std::cout << "Collected " << trackDistances[mat.name].size()
+//               << " xoffsets\n";
+//
+//     double sum = std::accumulate(trackDistances[mat.name].begin(),
+//                                  trackDistances[mat.name].end(), 0.0);
+//     double mean = sum / trackDistances[mat.name].size();
+//
+//     double sq_sum = std::inner_product(trackDistances[mat.name].begin(),
+//                                        trackDistances[mat.name].end(),
+//                                        trackDistances[mat.name].begin(),
+//                                        0.0);
+//     double stdev =
+//         std::sqrt(sq_sum / trackDistances[mat.name].size() - mean * mean);
+//
+//     std::cout << "mean: " << mean << " stdev: " << stdev << "\n";
+//
+//     RooRealVar rv_xoffset("rv_xoffset", "", mean - 300, mean + 300);
+//
+//     RooDataSet dataset_xoffset("dataset_xoffset", "", RooArgSet(rv_xoffset));
+//     for (const auto xoffset : trackDistances[mat.name]) {
+//       // veto absurd offset values (noise / wrongly associated clusters)
+//       if (xoffset > mean + 300 || xoffset < mean - 300) continue;
+//       rv_xoffset.setVal(xoffset);
+//       dataset_xoffset.add(RooArgSet(rv_xoffset));
+//     }
+//     dataset_xoffset.Print();
+//     RooRealVar rv_mean("rv_mean", "", mean, mean - 100, mean + 100);
+//     RooRealVar rv_sigma("rv_sigma", "", 50, 0, 100);
+//     RooGaussian gauss("gauss", "", rv_xoffset, rv_mean, rv_sigma);
+//
+//     RooFitResult *fr = gauss.fitTo(dataset_xoffset, RooFit::Save(true),
+//                                    RooFit::Minimizer("Minuit2", "minimize"));
+//
+//     RooPlot *plot = rv_xoffset.frame();
+//     dataset_xoffset.plotOn(plot);
+//     gauss.plotOn(plot);
+//     plot->Draw();
+//
+//     can_offset.SaveAs(replace(offsetFileName, ".txt", ".pdf").c_str());
+//
+//     fr->Print("v");
+//
+//     offsetFile << mat.name << "\t" << rv_mean.getVal() << "\n";
+//     offsets[mat.name] = rv_mean.getVal();
+//   }
+//
+//   offsetFile.close();
+//   return offsets;
+// }
+
+// this is with track reco
+// std::map<std::string, double> calc_x_offset(
+//     std::map<std::string, double> zPositions,
+//     std::map<std::string, std::vector<Cluster *>> clusters,
+//     std::vector<FibMatInfo> fibreMats, std::string offsetFileName) {
+//   std::map<std::string, std::vector<double>> trackDistances;
+//   std::string this_mat;
+//   std::vector<std::string> other_mats;
+//   std::vector<Point> points;
+//   Line current_track;
+//   if (zPositions.size() < 3) {
+//     std::cerr
+//         << "Error in calc_x_offset: not enaugh fibre mats to find a track\n"
+//         << "Found " << zPositions.size() << ", need at least 3\n";
+//     throw std::runtime_error("Not enaugh fibre mats to do tracking");
+//   }
+//   // fit a line using clusters in all fibre mats
+//   // except the one currectly looking at
+//   for (const auto &mat : fibreMats) {
+//     this_mat = mat.name;
+//     other_mats.clear();
+//     for (const auto &mat2 : fibreMats) {
+//       if (mat2.name == this_mat) {
+//         continue;
+//       }
+//       other_mats.push_back(mat2.name);
+//     }
+//     for (unsigned int i = 0; i < clusters[mat.name].size(); ++i) {
+//       points.clear();
+//       for (const auto &other_mat : other_mats) {
+//         points.push_back(
+//             {zPositions[other_mat],
+//              clusters[other_mat][i]->GetChargeWeightedMean() * 250.});
+//       }
+//       current_track.fitPoints(points);
+//       trackDistances[mat.name].push_back(
+//           current_track.getYforX(zPositions[mat.name]) -
+//           (clusters[mat.name][i]->GetChargeWeightedMean() * 250.));
+//     }
+//   }
+//   // fit gaussian to offsets and store the found offset in a file
+//   boost::filesystem::path p(offsetFileName);
+//   boost::filesystem::create_directories(p.parent_path());
+//   std::ofstream offsetFile(offsetFileName);
+//   std::map<std::string, double> offsets;
+//   for (const auto &mat : fibreMats) {
+//     TCanvas can_offset;
+//     std::cout << "Collected " << trackDistances[mat.name].size()
+//               << " xoffsets\n";
+//
+//     double sum = std::accumulate(trackDistances[mat.name].begin(),
+//                                  trackDistances[mat.name].end(), 0.0);
+//     double mean = sum / trackDistances[mat.name].size();
+//
+//     double sq_sum = std::inner_product(trackDistances[mat.name].begin(),
+//                                        trackDistances[mat.name].end(),
+//                                        trackDistances[mat.name].begin(),
+//                                        0.0);
+//     double stdev =
+//         std::sqrt(sq_sum / trackDistances[mat.name].size() - mean * mean);
+//
+//     std::cout << "mean: " << mean << " stdev: " << stdev << "\n";
+//
+//     RooRealVar rv_xoffset("rv_xoffset", "", mean - 300, mean + 300);
+//
+//     RooDataSet dataset_xoffset("dataset_xoffset", "", RooArgSet(rv_xoffset));
+//     for (const auto xoffset : trackDistances[mat.name]) {
+//       // veto absurd offset values (noise / wrongly associated clusters)
+//       if (xoffset > mean + 300 || xoffset < mean - 300) continue;
+//       rv_xoffset.setVal(xoffset);
+//       dataset_xoffset.add(RooArgSet(rv_xoffset));
+//     }
+//     dataset_xoffset.Print();
+//     RooRealVar rv_mean("rv_mean", "", mean, mean - 100, mean + 100);
+//     RooRealVar rv_sigma("rv_sigma", "", 50, 0, 100);
+//     RooGaussian gauss("gauss", "", rv_xoffset, rv_mean, rv_sigma);
+//
+//     RooFitResult *fr = gauss.fitTo(dataset_xoffset, RooFit::Save(true),
+//                                    RooFit::Minimizer("Minuit2", "minimize"));
+//
+//     RooPlot *plot = rv_xoffset.frame();
+//     dataset_xoffset.plotOn(plot);
+//     gauss.plotOn(plot);
+//     plot->Draw();
+//
+//     can_offset.SaveAs(replace(offsetFileName, ".txt", ".pdf").c_str());
+//
+//     fr->Print("v");
+//
+//     offsetFile << mat.name << "\t" << rv_mean.getVal() << "\n";
+//     offsets[mat.name] = rv_mean.getVal();
+//   }
+//
+//   offsetFile.close();
+//   return offsets;
+// }
