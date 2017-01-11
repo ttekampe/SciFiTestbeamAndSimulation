@@ -457,7 +457,9 @@ void correctFile(
     const std::map<unsigned int, std::map<unsigned int, double>> &gains,
     const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
     const unsigned int uplinkMin, const unsigned int uplinkMax,
-    const unsigned int nAdcs, TString newFileName) {
+    const unsigned int nAdcs, TString newFileName,
+    const std::vector<int> uplinks2flip,
+    bool is2016) {
 
   //  newFileName = removePath(newFileName);
   //  TFile correctedFile(("/data/testbeam/data/corrected/" +
@@ -494,17 +496,26 @@ void correctFile(
     tree2correct->GetEntry(i);
     for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
       for (unsigned int adc = 1; adc <= nAdcs; ++adc) {
+	unsigned int uplinkIndex = uplink - uplinkMin;
+	unsigned int adcIndex = adc-1;
+	if(is2016){
+	  adcIndex = correctedChannel(adc-1,std::find(uplinks2flip.begin(), uplinks2flip.end(), uplink) != uplinks2flip.end());
+	  //flip if the uplink in question is in the range of uplinks to flip.
+	}
         //      std::cout << uplink << "\t" << adc << "\n";
-        if (gains.at(uplink).at(adc))
-          correctedAdcVals[uplink - uplinkMin][adc - 1] =
-              (rawAdcVals[uplink - uplinkMin][adc - 1] -
+        if (gains.at(uplink).at(adc)){
+	  
+          correctedAdcVals[uplinkIndex][adcIndex] =
+              (rawAdcVals[uplinkIndex][adc - 1] -
                pedestals.at(uplink).at(adc)) /
               gains.at(uplink).at(adc); // if gain is not 0
-        else
-          correctedAdcVals[uplink - uplinkMin][adc - 1] =
+	}
+        else{
+          correctedAdcVals[uplinkIndex][adcIndex] =
               0.0; // gain fit failed!
         //      std::cout << correctedAdcVals[uplink - uplinkMin][adc-1] <<
         //      std::endl;
+	}
       }
     }
     correctedTree->Fill();
@@ -519,4 +530,31 @@ void correctFile(
   }
   delete[] correctedAdcVals;
   delete[] rawAdcVals;
+}
+
+
+int correctedChannel(const int inChannel, const bool isPhysicallyFlipped){
+  //from roman.
+  static int permutation[] = {
+    30, 225,  31, 224,  28, 227,  29, 226,  26, 229,  27, 228,  24, 231,  25, 230,
+    22, 233,  23, 232,  20, 235,  21, 234,  18, 237,  19, 236,  16, 239,  17, 238,
+    14, 241,  15, 240,  12, 243,  13, 242,  10, 245,  11, 244,   8, 247,   9, 246,
+    6, 249,   7, 248,   4, 251,   5, 250,   2, 253,   3, 252,   0, 255,   1, 254,
+    62, 193,  63, 192,  60, 195,  61, 194,  58, 197,  59, 196,  56, 199,  57, 198,
+    54, 201,  55, 200,  52, 203,  53, 202,  50, 205,  51, 204,  48, 207,  49, 206,
+    46, 209,  47, 208,  44, 211,  45, 210,  42, 213,  43, 212,  40, 215,  41, 214,
+    38, 217,  39, 216,  36, 219,  37, 218,  34, 221,  35, 220,  32, 223,  33, 222,
+    94, 161,  95, 160,  92, 163,  93, 162,  90, 165,  91, 164,  88, 167,  89, 166,
+    86, 169,  87, 168,  84, 171,  85, 170,  82, 173,  83, 172,  80, 175,  81, 174,
+    78, 177,  79, 176,  76, 179,  77, 178,  74, 181,  75, 180,  72, 183,  73, 182,
+    70, 185,  71, 184,  68, 187,  69, 186,  66, 189,  67, 188,  64, 191,  65, 190,
+    126, 129, 127, 128, 124, 131, 125, 130, 122, 133, 123, 132, 120, 135, 121, 134,
+    118, 137, 119, 136, 116, 139, 117, 138, 114, 141, 115, 140, 112, 143, 113, 142,
+    110, 145, 111, 144, 108, 147, 109, 146, 106, 149, 107, 148, 104, 151, 105, 150,
+    102, 153, 103, 152, 100, 155, 101, 154,  98, 157,  99, 156,  96, 159,  97, 158};
+
+  int sample = permutation[inChannel];
+  
+  if (isPhysicallyFlipped) sample^= 255;
+  return sample;
 }

@@ -26,8 +26,12 @@ struct config {
   std::string darkFileName;
   unsigned int uplinkMin;
   unsigned int uplinkMax;
+  unsigned int adcChanMin;
+  unsigned int adcChanMax;
   bool debug;
   std::string outputLocation; // AD 18-10-16
+  bool is2016;//AD 11-1-17
+  std::vector<int> u2f;//uplinks 2 flip, intermediate
 };
 // todo. Change all output locations to the config struct val
 // todo. make directories if they don't exist already
@@ -62,15 +66,18 @@ int parseOptions(config &c, int argc, char *argv[]) {
 
   // declare options
   po::options_description desc("Allowed options");
-  desc.add_options()("help,h", "show this help")(
-      "file2correct,f", po::value<std::string>(&c.file2correct),
-      "test beam data file")(
-      "umax,u", po::value<unsigned int>(&c.uplinkMax)->default_value(4),
-      "uplink number to start at [1, ... , 8]")(
-      "umin,l", po::value<unsigned int>(&c.uplinkMin)->default_value(3),
-      "uplink number to stop at [1, ... , 8]")(
-      "outputlocation,o", po::value<std::string>(&c.outputLocation),
-      "output location");
+
+  desc.add_options()
+    ("help,h", "show this help")
+    ("file2correct,f", po::value<std::string>(&c.file2correct),"test beam data file")
+    ("umax,u", po::value<unsigned int>(&c.uplinkMax)->default_value(4),"uplink number to start at [1, ... , 8]")
+    ("umin,l", po::value<unsigned int>(&c.uplinkMin)->default_value(3),"uplink number to stop at [1, ... , 8]")
+    ("adcMin,a",po::value<unsigned int>(&c.adcChanMin)->default_value(1),"minimum ADC channel number (default 1)")
+    ("adcMax,m",po::value<unsigned int>(&c.adcChanMax)->default_value(128),"maximum ADC channel number (default 128)")
+    ("outputlocation,o", po::value<std::string>(&c.outputLocation),"output location")
+    ("is2016,i",po::value<bool>(&c.is2016)->default_value(false),"is Nov 2016 data")
+    ("uplinks2flip,p",po::value<std::vector<int>>(&c.u2f)->multitoken(),"uplinks to physically flip for 2016 testbeam, ex 1 2 3")
+    ;
 
   // actually do the parsing
   po::variables_map vm;
@@ -83,7 +90,11 @@ int parseOptions(config &c, int argc, char *argv[]) {
     std::cout << desc << "\n";
     return 1;
   }
-
+  std::cout<<"uplinks2flip = "<<std::endl;
+  for(auto val: c.u2f){
+    std::cout<<val<<"\t";
+  }
+  std::cout<<std::endl;
   return 0;
 }
 
@@ -168,7 +179,7 @@ int main(int argc, char *argv[]) {
   std::ifstream gainFile(gainFileName);
   if (!gainFile) {
     std::cout << "could not find gainfile -> producing gains" << std::endl;
-    produceGains(ledTree, c.uplinkMin, c.uplinkMax, 1, 128, 4, c.ledFileName,
+    produceGains(ledTree, c.uplinkMin, c.uplinkMax, c.adcChanMin, c.adcChanMax, 4, c.ledFileName,
                  c.outputLocation + "/results/gains/");
   } else
     std::cout << "found gain file." << std::endl;
@@ -180,10 +191,10 @@ int main(int argc, char *argv[]) {
 
   std::cout << "reading pedestals" << std::endl;
   std::map<unsigned int, std::map<unsigned int, double>> pedestals =
-      getPedestals(c.darkFileName, c.uplinkMin, c.uplinkMax, 128);
+      getPedestals(c.darkFileName, c.uplinkMin, c.uplinkMax, c.adcChanMin);
 
   for (unsigned int i = c.uplinkMin; i <= c.uplinkMax; ++i) {
-    for (unsigned int j = 1; j <= 128; ++j) {
+    for (unsigned int j = c.adcChanMin; j <= c.adcChanMax; ++j) {
       std::cout << "uplink: " << i << "\tadc: " << j
                 << "\t pesdestal: " << pedestals[i][j]
                 << "\t gain: " << gains[i][j] << std::endl;
@@ -198,8 +209,8 @@ int main(int argc, char *argv[]) {
   //  newFileName.ReplaceAll(".root", "_corrected.root");
 
   std::cout << "correcting file" << std::endl;
-  correctFile(dataTree, gains, pedestals, c.uplinkMin, c.uplinkMax, 128,
-              newFileName);
+  correctFile(dataTree, gains, pedestals, c.uplinkMin, c.uplinkMax, c.adcChanMax,
+              newFileName,c.u2f,c.is2016);
 
   return 0;
 }

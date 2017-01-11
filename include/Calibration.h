@@ -65,8 +65,13 @@ void correctFile(TTree* tree2correct,
                  const unsigned int uplinkMin,
                  const unsigned int uplinkMax,
                  const unsigned int nAdcs,
-                 TString newFileName);
+                 TString newFileName,
+		 std::vector<int>uplinks2flip,
+		 bool is2016 = false
+		 );//added options for 2016 Nov testbeam.
 
 TString removePath(TString str);
+
+int correctedChannel(const int inChannel, const bool isPhysicallyFlipped);
 
 #endif
