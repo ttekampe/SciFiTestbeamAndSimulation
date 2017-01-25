@@ -4,9 +4,6 @@
 #include <utility>
 #include <vector>
 
-Cluster::Cluster() {}
-Cluster::~Cluster() {}
-
 Cluster::Cluster(const Cluster& other)
     : RelatedChannels(other.RelatedChannels) {}
 

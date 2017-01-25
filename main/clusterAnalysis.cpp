@@ -50,7 +50,6 @@ struct config {
 };
 
 int parseOptions(config &c, int argc, char *argv[]) {
-
   // declare options
   po::options_description desc("Allowed options");
   desc.add_options()("help", "show this help")(
@@ -89,7 +88,7 @@ std::string getPositionFromFileName(std::string fileName) {
   // in the case of the attenuation scan, the measured distance is returned
   // see https://twiki.cern.ch/twiki/bin/view/LHCb/SciFiTrackerTestBeam2015
   std::string position;
-  if (fileName.find("btsoftware") != std::string::npos) { // data
+  if (fileName.find("btsoftware") != std::string::npos) {  // data
     std::map<std::string, std::string> runNumbersAndPositions;
     runNumbersAndPositions["1431786652"] = "a";
     runNumbersAndPositions["1432091294"] = "a";
@@ -128,7 +127,7 @@ std::string getPositionFromFileName(std::string fileName) {
                    ? runNumbersAndPositions[currentRunNumber]
                    : "";
 
-  } else { // simulation
+  } else {  // simulation
     std::string lookFor = "testbeam_simulation_position_";
     auto posStartAt = fileName.find(lookFor) + lookFor.size();
     auto posEndAt = fileName.find("_", posStartAt);
@@ -140,7 +139,6 @@ std::string getPositionFromFileName(std::string fileName) {
 
 std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
                                     bool recursive_call = false) {
-
   TFile inputFile(file2analyse.c_str(), "READ");
   if (!inputFile.IsOpen()) {
     std::cout << "Could not open " << file2analyse << "\n";
@@ -169,7 +167,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   SLAYER3(DUT) Uplink 3 and 4
   */
 
-  std::map<std::string, std::vector<std::vector<Channel> *> *> data;
+  std::map<std::string, std::vector<std::vector<Channel>>> data;
 
   // offsets between the modules perpendicular to the beam
   std::vector<double> xPositions;
@@ -203,8 +201,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
       std::getline(offsetFile, line);
       std::istringstream ss(line);
       double offset;
-      if (ss >> offset)
-        xOffsets.push_back(offset);
+      if (ss >> offset) xOffsets.push_back(offset);
       std::cout << "Found xoffset: " << xOffsets[0] << "\n";
     }
   }
@@ -230,7 +227,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   // in the case of data this one stores the matched clusters
   clCreators["simulation"] = ClusterCreator();
 
-  std::map<std::string, std::vector<Cluster *>> clustersInModule;
+  std::map<std::string, std::vector<Cluster>> clustersInModule;
   clustersInModule["cern"];
   clustersInModule["slayer"];
   clustersInModule["HD2"];
@@ -240,8 +237,8 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   double missedEvents{0};
   double foundEvents{0};
   if (c.simulation) {
-    for (const auto &event : *data["simulation"]) {
-      clCreators["simulation"].FindClustersInEventBoole(*event, 1.5, 2.5, 4.0,
+    for (const auto &event : data["simulation"]) {
+      clCreators["simulation"].FindClustersInEventBoole(event, 1.5, 2.5, 4.0,
                                                         100, false);
       if (currentNumberOfClusters ==
           clCreators["simulation"].getNumberOfClusters())
@@ -251,29 +248,30 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   } else {
     for (unsigned int i = 0; i < inputTree->GetEntriesFast(); ++i) {
       clustersInModule["cern"] = clCreators["cern"].FindClustersInEventBoole(
-          *(data["cern"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+          (data["cern"].at(i)), 1.5, 2.5, 4.0, 100, false);
       clustersInModule["slayer"] =
           clCreators["slayer"].FindClustersInEventBoole(
-              *(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+              (data["slayer"].at(i)), 1.5, 2.5, 4.0, 100, false);
       clustersInModule["HD2"] = clCreators["HD2"].FindClustersInEventBoole(
-          *(data["HD2"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+          (data["HD2"].at(i)), 1.5, 2.5, 4.0, 100, false);
 
       if (clustersInModule["cern"].size() == 1 &&
           clustersInModule["slayer"].size() == 1 &&
-          clustersInModule["HD2"].size() == 1) { // if there is a cluster in all
-                                                 // modules, keep the one in the
-                                                 // slayer module
+          clustersInModule["HD2"].size() ==
+              1) {  // if there is a cluster in all
+                    // modules, keep the one in the
+                    // slayer module
 
         // why am I calling this again? Doesnt matter it's fast
         clustersInModule["slayer"] =
             clCreators["simulation"].FindClustersInEventBoole(
-                *(data["slayer"]->at(i)), 1.5, 2.5, 4.0, 100, false);
+                (data["slayer"].at(i)), 1.5, 2.5, 4.0, 100, false);
 
         // get the x positions of the clusters to do some primitive tracking
         xPositions = {
-            clustersInModule["HD2"][0]->GetChargeWeightedMean() * 250.,
-            clustersInModule["slayer"][0]->GetChargeWeightedMean() * 250.,
-            clustersInModule["cern"][0]->GetChargeWeightedMean() * 250.};
+            clustersInModule["HD2"][0].GetChargeWeightedMean() * 250.,
+            clustersInModule["slayer"][0].GetChargeWeightedMean() * 250.,
+            clustersInModule["cern"][0].GetChargeWeightedMean() * 250.};
 
         // just calculate the equation for a strright line through the cluster
         // positions in the HD2 and the CERN modules
@@ -330,8 +328,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
     RooDataSet dataset_xoffset("dataset_xoffset", "", RooArgSet(rv_xoffset));
     for (const auto xoffset : xOffsets) {
       // veto absurd offset values (noise / wrongly associated clusters)
-      if (xoffset > mean + 300 || xoffset < mean - 300)
-        continue;
+      if (xoffset > mean + 300 || xoffset < mean - 300) continue;
       rv_xoffset.setVal(xoffset);
       dataset_xoffset.add(RooArgSet(rv_xoffset));
     }
@@ -379,14 +376,14 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
 
   double meanLightYield{0};
   for (const auto &cl : clCreators["simulation"].getClusters()) {
-    meanLightYield += cl->GetSumOfAdcValues();
+    meanLightYield += cl.GetSumOfAdcValues();
   }
   meanLightYield /= (double)clCreators["simulation"].getNumberOfClusters();
 
   double stdDevLightYield{0};
   for (const auto &cl : clCreators["simulation"].getClusters()) {
-    stdDevLightYield += (cl->GetSumOfAdcValues() - meanLightYield) *
-                        (cl->GetSumOfAdcValues() - meanLightYield);
+    stdDevLightYield += (cl.GetSumOfAdcValues() - meanLightYield) *
+                        (cl.GetSumOfAdcValues() - meanLightYield);
   }
 
   stdDevLightYield *=
@@ -406,10 +403,10 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
               << " clusters in " << inputTree->GetEntriesFast() << " events!\n";
     std::cout << "Missed " << missedEvents << " events\n";
     double event2OneOrMoreClusterEff =
-        1. - (double)missedEvents / data["simulation"]->size();
+        1. - (double)missedEvents / data["simulation"].size();
     double event2OneOrMoreClusterEffErr = TMath::Sqrt(
         (1 - event2OneOrMoreClusterEff) * event2OneOrMoreClusterEff /
-        (double)data["simulation"]->size());
+        (double)data["simulation"].size());
     std::cout << "Rate of MCEvent producing one or more clusters: "
               << event2OneOrMoreClusterEff << " +/- "
               << event2OneOrMoreClusterEffErr << "\n";
@@ -454,12 +451,6 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
            .ReplaceAll(".root", "_clusterAnalyis" + c.tag + ".root"))
           .Data(),
       features);
-  for (auto &module : data) {
-    for (unsigned int entryIndex = 0; entryIndex < module.second->size();
-         ++entryIndex) {
-      delete module.second->at(entryIndex);
-    }
-  }
   delete inputTree;
   inputFile.Close();
 
@@ -467,7 +458,6 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
 }
 
 int main(int argc, char *argv[]) {
-
   config c;
   if (parseOptions(c, argc, argv) != 0) {
     std::cerr << "Can not parse options!" << std::endl;
@@ -481,7 +471,6 @@ int main(int argc, char *argv[]) {
   std::pair<EDouble, EDouble> lightAndEff;
 
   for (const auto &file2analyse : c.files2analyse) {
-
     lightAndEff = analyse(file2analyse, c);
     hitEffFile << getPositionFromFileName(file2analyse) << ","
                << lightAndEff.first.GetVal() << ","

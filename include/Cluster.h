@@ -1,21 +1,18 @@
 #ifndef CLUSTER_H
 #define CLUSTER_H
 
+// from std
 #include <vector>
-
-struct Channel {
-  unsigned int Uplink;
-  unsigned int ChannelNumber;
-  double AdcValue;
-};
+// from here
+#include "Channel.h"
 
 class Cluster {
  private:
   std::vector<Channel> RelatedChannels;
 
  public:
-  Cluster();
-  ~Cluster();
+  Cluster() = default;
+  ~Cluster() = default;
   Cluster(const Cluster& other);             // copy construction
   Cluster(Cluster&& other);                  // move construction
   Cluster& operator=(const Cluster& other);  // copy assignment

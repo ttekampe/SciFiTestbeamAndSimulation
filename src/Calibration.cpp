@@ -39,14 +39,12 @@ TString removePath(TString str) {
   return str;
 }
 
-std::vector<Event *> *parseRootTree(
+std::vector<Event> parseRootTree(
     TTree *dataTree, unsigned int uplinkMin, unsigned int uplinkMax,
     unsigned int nAdcs,
     const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
     const std::map<unsigned int, std::map<unsigned int, double>> &gains) {
-
-  std::vector<Event *> *dataVector =
-      new std::vector<Event *>(dataTree->GetEntriesFast());
+  std::vector<Event> dataVector(dataTree->GetEntriesFast());
 
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
   float **adcVals = new float *[nUplinks];
@@ -66,7 +64,7 @@ std::vector<Event *> *parseRootTree(
   }
   for (unsigned int i = 0; i < dataTree->GetEntriesFast(); ++i) {
     dataTree->GetEntry(i);
-    Event *event = new Event(nAdcs * (uplinkMax - uplinkMin + 1));
+    Event event(nAdcs * (uplinkMax - uplinkMin + 1));
     for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
       for (unsigned int adc = 0; adc < nAdcs; ++adc) {
         Channel c;
@@ -75,10 +73,10 @@ std::vector<Event *> *parseRootTree(
         c.AdcValue = (adcVals[uplink - uplinkMin][adc] -
                       pedestals.at(uplink).at(adc + 1)) /
                      gains.at(uplink).at(adc + 1);
-        event->at(adc + (uplink - uplinkMin) * nAdcs) = c;
+        event[(adc + (uplink - uplinkMin) * nAdcs)] = c;
       }
     }
-    dataVector->at(i) = event;
+    dataVector[i] = event;
   }
 
   dataTree->ResetBranchAddresses();
@@ -90,14 +88,11 @@ std::vector<Event *> *parseRootTree(
   return dataVector;
 }
 
-std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
-                                             unsigned int uplinkMin,
-                                             unsigned int uplinkMax,
-                                             unsigned int nAdcs,
-                                             double factor) {
-
-  std::vector<Event *> *dataVector =
-      new std::vector<Event *>(dataTree->GetEntriesFast());
+std::vector<Event> parseCorrectedRootTree(TTree *dataTree,
+                                          unsigned int uplinkMin,
+                                          unsigned int uplinkMax,
+                                          unsigned int nAdcs, double factor) {
+  std::vector<Event> dataVector(dataTree->GetEntriesFast());
 
   if (factor != 1.)
     std::cout << "Parsing corrected root tree and correct the adc value for "
@@ -127,7 +122,7 @@ std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
             << "\n";
   for (unsigned int i = 0; i < dataTree->GetEntriesFast(); ++i) {
     dataTree->GetEntry(i);
-    Event *event = new Event(nAdcs * (uplinkMax - uplinkMin + 1));
+    Event event(nAdcs * (uplinkMax - uplinkMin + 1));
     for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
       for (unsigned int adc = 0; adc < nAdcs; ++adc) {
         //          std::cout << "stroring adcVals[" << uplink-uplinkMin << "]["
@@ -145,10 +140,10 @@ std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
         //}
         //          std::cout << uplink << "\t" << adc << "\t" <<
         //          adcVals[uplink-uplinkMin][adc] << "\n";
-        event->at(adc + (uplink - uplinkMin) * nAdcs) = c;
+        event[adc + (uplink - uplinkMin) * nAdcs] = c;
       }
     }
-    dataVector->at(i) = event;
+    dataVector[i] = event;
   }
 
   //  dataTree->ResetBranchAddresses();
@@ -256,10 +251,10 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       RooAbsReal *nll = pdf.createNLL(dataSet);
 
       RooMinuit minu(*nll);
-      minu.setStrategy(2); // ensure minimum true, errors correct
+      minu.setStrategy(2);  // ensure minimum true, errors correct
 
       // call MIGRAD -- minimises the likelihood
-      int migradStatusCode = minu.migrad(); // catch status code
+      int migradStatusCode = minu.migrad();  // catch status code
 
       // could also get an intermediary RooFitResult if you want
       //      RooFitResult *migradFitResult = m.save();
@@ -269,7 +264,7 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       int hesseStatusCode = minu.hesse();
 
       RooFitResult *fs =
-          minu.save(); // equivalent result to that from fitTo call
+          minu.save();  // equivalent result to that from fitTo call
 
       // check for success
       int covarianceQuality = fs->covQual();
@@ -278,7 +273,7 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
 
       bool isAGoodFit =
           ((hesseStatusCode == 0) && (migradStatusCode == 0) &&
-           (covarianceQuality == 3)); // && (minosStatusCode==0) );
+           (covarianceQuality == 3));  // && (minosStatusCode==0) );
 
       if (!isAGoodFit || gain.getError() == 0.0) {
         ++failedFits;
@@ -314,8 +309,8 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
             << std::endl;
 }
 
-std::map<unsigned int, std::map<unsigned int, double>>
-readGains(std::string fileName) {
+std::map<unsigned int, std::map<unsigned int, double>> readGains(
+    std::string fileName) {
   std::ifstream inputFile(fileName);
   std::string line;
   int uplinkNumber{0};
@@ -360,9 +355,8 @@ readGains(std::string fileName) {
   return gains;
 }
 
-calibrationRunNumbers
-lookUpCalibrationFiles(const unsigned int runNumber,
-                       const std::string catalogueFileName) {
+calibrationRunNumbers lookUpCalibrationFiles(
+    const unsigned int runNumber, const std::string catalogueFileName) {
   //  std::ifstream fileCatalogue("/data/testbeam/data/runNumbers.txt");
   std::ifstream fileCatalogue(catalogueFileName);
   unsigned int currentRunNumber = 0;
@@ -379,8 +373,9 @@ lookUpCalibrationFiles(const unsigned int runNumber,
       return rv;
     }
   }
-  throw std::runtime_error("calibration::lookUpCalibrationFiles: Unable to "
-                           "find a match in run number catalogue.");
+  throw std::runtime_error(
+      "calibration::lookUpCalibrationFiles: Unable to "
+      "find a match in run number catalogue.");
 }
 
 unsigned int runNumberFromFilename(std::string filename) {
@@ -395,9 +390,9 @@ unsigned int runNumberFromFilename(std::string filename) {
   return std::stoi(match[0]);
 }
 
-std::map<unsigned int, std::map<unsigned int, double>>
-getPedestals(const std::string fileName, const unsigned int uplinkMin,
-             const unsigned int uplinkMax, const unsigned int nAdcs) {
+std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
+    const std::string fileName, const unsigned int uplinkMin,
+    const unsigned int uplinkMax, const unsigned int nAdcs) {
   TFile pedestalFile(fileName.c_str(), "READ");
   if (!pedestalFile.IsOpen()) {
     std::cerr << "unable to open pedestal file " << fileName << std::endl;
@@ -458,7 +453,6 @@ void correctFile(
     const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
     const unsigned int uplinkMin, const unsigned int uplinkMax,
     const unsigned int nAdcs, TString newFileName) {
-
   //  newFileName = removePath(newFileName);
   //  TFile correctedFile(("/data/testbeam/data/corrected/" +
   //  newFileName).Data(), "RECREATE");
@@ -499,10 +493,10 @@ void correctFile(
           correctedAdcVals[uplink - uplinkMin][adc - 1] =
               (rawAdcVals[uplink - uplinkMin][adc - 1] -
                pedestals.at(uplink).at(adc)) /
-              gains.at(uplink).at(adc); // if gain is not 0
+              gains.at(uplink).at(adc);  // if gain is not 0
         else
           correctedAdcVals[uplink - uplinkMin][adc - 1] =
-              0.0; // gain fit failed!
+              0.0;  // gain fit failed!
         //      std::cout << correctedAdcVals[uplink - uplinkMin][adc-1] <<
         //      std::endl;
       }
