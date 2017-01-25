@@ -38,7 +38,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 #endif()
 
 #commented out -Wall
-set(CMAKE_CXX_FLAGS_RELEASE "-O2 -Wall")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -Wall -Wextra")
 #set(CMAKE_CXX_FLAGS_RELEASE "-g")
 include(CheckCXXCompilerFlag)
 # CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
