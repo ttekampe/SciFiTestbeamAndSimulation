@@ -13,8 +13,8 @@
 class ClusterMonitor {
  private:
  public:
-  ClusterMonitor(){};
-  ~ClusterMonitor(){};
+  ClusterMonitor() = default;
+  ~ClusterMonitor() = default;
   typedef std::map<std::string, std::vector<double> > feature_map;
 
   void WriteToNtuple(const ClusterCreator& clCreator,

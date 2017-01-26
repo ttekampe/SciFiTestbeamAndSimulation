@@ -62,9 +62,8 @@ void fnc(int& npar, double* deriv, double& func, double param[], int flag) {
 }
 
 Aligner::Aligner(std::map<std::string, std::vector<Cluster>> _data,
-                 std::vector<FibMatInfo> _mats) {
-  data = _data;
-  mats = _mats;
+                 std::vector<FibMatInfo> _mats)
+    : data(_data), mats(_mats) {
   int idx{0};
   // map the name of each fibre mats to an index used in the arrays TMinuit
   // takes as arguments
