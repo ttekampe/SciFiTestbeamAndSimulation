@@ -17,6 +17,7 @@ Cluster& Cluster::operator=(const Cluster& other) {
 
 Cluster& Cluster::operator=(Cluster&& other) {
   RelatedChannels = std::move(other.RelatedChannels);
+
   return *this;
 }
 
@@ -28,7 +29,7 @@ void Cluster::AddChannel(const unsigned int uplNumber,
   c.Uplink = uplNumber;
   c.ChannelNumber = chanNumber;
   c.AdcValue = adcValue;
-  RelatedChannels.push_back(c);
+  RelatedChannels.push_back(std::move(c));
 }
 
 void Cluster::RemoveChannel(const unsigned int chanNumber) {

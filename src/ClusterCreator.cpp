@@ -31,7 +31,7 @@ std::vector<Cluster> ClusterCreator::FindClustersInEventMax(
       if (currentCluster.GetMaximumAdcValue() > seed_threshold &&
           currentCluster.GetSumOfAdcValues() > sum_threshold) {
         clusters.push_back(currentCluster);
-        foundClusters.push_back(currentCluster);
+        foundClusters.push_back(std::move(currentCluster));
       }
       have_cluster = false;
     }
@@ -205,9 +205,8 @@ std::vector<Cluster> ClusterCreator::FindClustersInEventBoole(
         // Define new cluster
         //  FTCluster::FTCluster( LHCb::FTChannelID &id, double fraction, int
         //  size, int charge )
-
-        clusters.push_back(currentCluster);
         foundClusters.push_back(currentCluster);
+        clusters.push_back(std::move(currentCluster));
 
       }  // end of Cluster satisfies charge / size requirements
       else

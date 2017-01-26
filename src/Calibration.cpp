@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -44,13 +45,11 @@ std::vector<Event> parseRootTree(
     unsigned int nAdcs,
     const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
     const std::map<unsigned int, std::map<unsigned int, double>> &gains) {
-  std::vector<Event> dataVector(dataTree->GetEntriesFast());
+  std::vector<Event> dataVector(dataTree->GetEntries());
 
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
-  float **adcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nAdcs; ++i) {
-    adcVals[i] = new float[nAdcs];
-  }
+
+  std::vector<std::vector<float>> adcVals(nUplinks, std::vector<float>(nAdcs));
 
   dataTree->SetBranchStatus("*", 0);
   for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -73,17 +72,13 @@ std::vector<Event> parseRootTree(
         c.AdcValue = (adcVals[uplink - uplinkMin][adc] -
                       pedestals.at(uplink).at(adc + 1)) /
                      gains.at(uplink).at(adc + 1);
-        event[(adc + (uplink - uplinkMin) * nAdcs)] = c;
+        event[(adc + (uplink - uplinkMin) * nAdcs)] = std::move(c);
       }
     }
-    dataVector[i] = event;
+    dataVector[i] = std::move(event);
   }
 
   dataTree->ResetBranchAddresses();
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] adcVals[i];
-  }
-  delete[] adcVals;
 
   return dataVector;
 }
@@ -100,13 +95,7 @@ std::vector<Event> parseCorrectedRootTree(TTree *dataTree,
               << factor << "!\n";
 
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
-  float **adcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    adcVals[i] = new float[nAdcs];
-  }
-
-  //  std::vector<std::vector<float> > adcVals(nUplinks,
-  //  std::vector<float>(nAdcs));
+  std::vector<std::vector<float>> adcVals(nUplinks, std::vector<float>(nAdcs));
 
   dataTree->SetBranchStatus("*", 0);
   for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -140,17 +129,13 @@ std::vector<Event> parseCorrectedRootTree(TTree *dataTree,
         //}
         //          std::cout << uplink << "\t" << adc << "\t" <<
         //          adcVals[uplink-uplinkMin][adc] << "\n";
-        event[adc + (uplink - uplinkMin) * nAdcs] = c;
+        event[adc + (uplink - uplinkMin) * nAdcs] = std::move(c);
       }
     }
-    dataVector[i] = event;
+    dataVector[i] = std::move(event);
   }
 
   //  dataTree->ResetBranchAddresses();
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] adcVals[i];
-  }
-  delete[] adcVals;
 
   return dataVector;
 }
@@ -199,12 +184,6 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       auto max_peak = *std::max_element(peaks, peaks + nGaussians);
       auto min_peak = *std::min_element(peaks, peaks + nGaussians);
 
-      //      std::cout << "Found peaks at ";
-      //      for(unsigned int k = 0; k<nGaussians; ++k){
-      //        std::cout << peaks [k] << "\t";
-      //      }
-      //      std::cout << std::endl;
-
       RooRealVar adcCount(branchName, branchName, min_peak - 30.,
                           max_peak + 30.);
       RooRealVar mean("mean", "", min_peak, 420., 650.);
@@ -214,32 +193,33 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
                       45., 75.);
       RooDataSet dataSet("dataSet", "", t, RooArgSet(adcCount));
 
-      std::vector<RooGaussian *> gaussians(nGaussians, nullptr);
-      std::vector<RooFormulaVar *> means(nGaussians, nullptr);
-      std::vector<RooFormulaVar *> sigmas(nGaussians, nullptr);
-      std::vector<RooRealVar *> fractions(nGaussians - 1, nullptr);
+      std::vector<std::shared_ptr<RooGaussian>> gaussians(nGaussians, nullptr);
+      std::vector<std::shared_ptr<RooFormulaVar>> means(nGaussians, nullptr);
+      std::vector<std::shared_ptr<RooFormulaVar>> sigmas(nGaussians, nullptr);
+      std::vector<std::shared_ptr<RooRealVar>> fractions(nGaussians - 1,
+                                                         nullptr);
 
       RooArgList gaussianList("gaussianList");
       RooArgList fractionList("fractionList");
       for (unsigned int j = 0; j < nGaussians; ++j) {
-        means[j] =
-            new RooFormulaVar(TString("mean_" + std::to_string(j)).Data(), "",
-                              TString("mean+gain*" + std::to_string(j)).Data(),
-                              RooArgList(mean, gain));
-        sigmas[j] =
-            new RooFormulaVar(TString("sigma_" + std::to_string(j)).Data(), "",
-                              TString("sqrt(sigma1*sigma1+" +
-                                      std::to_string(j) + "*sigma2*sigma2)")
-                                  .Data(),
-                              RooArgList(sigma1, sigma2));
-        gaussians[j] =
-            new RooGaussian(TString("gaussian_" + std::to_string(j)).Data(), "",
-                            adcCount, *means[j], *sigmas[j]);
+        means[j] = std::make_shared<RooFormulaVar>(
+            TString("mean_" + std::to_string(j)).Data(), "",
+            TString("mean+gain*" + std::to_string(j)).Data(),
+            RooArgList(mean, gain));
+        sigmas[j] = std::make_shared<RooFormulaVar>(
+            TString("sigma_" + std::to_string(j)).Data(), "",
+            TString("sqrt(sigma1*sigma1+" + std::to_string(j) +
+                    "*sigma2*sigma2)")
+                .Data(),
+            RooArgList(sigma1, sigma2));
+        gaussians[j] = std::make_shared<RooGaussian>(
+            TString("gaussian_" + std::to_string(j)).Data(), "", adcCount,
+            *means[j], *sigmas[j]);
         gaussianList.add(*gaussians[j]);
         if (j > 0) {
-          fractions[j - 1] =
-              new RooRealVar(TString("fraction_" + std::to_string(j)).Data(),
-                             "", 1. / 2. / j, 0., 1.);
+          fractions[j - 1] = std::make_shared<RooRealVar>(
+              TString("fraction_" + std::to_string(j)).Data(), "", 1. / 2. / j,
+              0., 1.);
           fractionList.add(*fractions[j - 1]);
         }
       }
@@ -293,14 +273,6 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       pdf.plotOn(myFrame);
       myFrame->Draw();
       can.SaveAs((savePath + canvasName).Data());
-
-      for (unsigned int i = 0; i < nGaussians; ++i) {
-        delete means[i];
-        delete gaussians[i];
-        if (i > 0) {
-          delete fractions[i - 1];
-        }
-      }
     }
   }
   can.SaveAs((savePath + canvasName + "]").Data());
@@ -379,9 +351,6 @@ calibrationRunNumbers lookUpCalibrationFiles(
 }
 
 unsigned int runNumberFromFilename(std::string filename) {
-  // if(size_t posOfSlash = filename.rfind("/") != std::string::npos){
-  //   filename = filename.substr(posOfSlash+1);
-  // }
   filename = removePath(filename);
   // In May15 testbeam, unixtime was used as runNumber and contained 10 digits
   std::regex re("\\d{10,}");
@@ -404,10 +373,10 @@ std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
   std::cout << "creating double array of form double[" << nUplinks << "]["
             << nAdcs << "]\n";
-  float **rawAdcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    rawAdcVals[i] = new float[nAdcs];
-  }
+
+  std::vector<std::vector<float>> rawAdcVals(nUplinks,
+                                             std::vector<float>(nAdcs));
+
   std::cout << "setting branch addresses" << std::endl;
   std::string branchNameTemplate1 = "Uplink_";
   for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -439,10 +408,6 @@ std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
   }
   pedestalTree->ResetBranchAddresses();
   pedestalFile.Close();
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] rawAdcVals[i];
-  }
-  delete[] rawAdcVals;
 
   return pedestals;
 }
@@ -458,18 +423,14 @@ void correctFile(
   //  newFileName).Data(), "RECREATE");
 
   TFile correctedFile(newFileName.Data(), "RECREATE");
-  TTree *correctedTree = new TTree("rawData", "rawData");
+  auto correctedTree = std::make_unique<TTree>("rawData", "rawData");
 
   // setup fill mechanism for new TTree
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
-  float **correctedAdcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    correctedAdcVals[i] = new float[nAdcs];
-  }
-  float **rawAdcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    rawAdcVals[i] = new float[nAdcs];
-  }
+  std::vector<std::vector<float>> rawAdcVals(nUplinks,
+                                             std::vector<float>(nAdcs));
+  std::vector<std::vector<float>> correctedAdcVals(nUplinks,
+                                                   std::vector<float>(nAdcs));
 
   std::string branchNameTemplate1 = "Uplink_";
   for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -506,11 +467,4 @@ void correctFile(
   correctedTree->ResetBranchAddresses();
   correctedTree->Write();
   correctedFile.Close();
-
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] correctedAdcVals[i];
-    delete[] rawAdcVals[i];
-  }
-  delete[] correctedAdcVals;
-  delete[] rawAdcVals;
 }
