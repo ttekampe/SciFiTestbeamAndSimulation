@@ -42,7 +42,7 @@ std::vector<Cluster> ClusterCreator::FindClustersInEventMax(
 std::vector<Cluster> ClusterCreator::FindClustersInEventBoole(
     const Event& event, const double neighbourThreshold,
     const double seedThreshold, const double sumThreshold,
-    const int maxClusterSize, bool debug) {
+    const int maxClusterSize) {
   std::vector<Cluster> foundClusters;
   std::vector<Channel>::const_iterator lastStopDigitIter =
       event.begin();  // end digit of last cluster, to prevent overlap

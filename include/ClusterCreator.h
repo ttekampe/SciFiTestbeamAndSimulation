@@ -26,8 +26,7 @@ class ClusterCreator {
                                                 const double neighbourThreshold,
                                                 const double seedThreshold,
                                                 const double sumThreshold,
-                                                const int maxClusterSize,
-                                                bool debug);
+                                                const int maxClusterSize);
 
   std::size_t getNumberOfClusters() const;
   const std::vector<Cluster>& getClusters() const;

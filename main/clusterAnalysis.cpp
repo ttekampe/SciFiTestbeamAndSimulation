@@ -239,7 +239,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   if (c.simulation) {
     for (const auto &event : data["simulation"]) {
       clCreators["simulation"].FindClustersInEventBoole(event, 1.5, 2.5, 4.0,
-                                                        100, false);
+                                                        100);
       if (currentNumberOfClusters ==
           clCreators["simulation"].getNumberOfClusters())
         ++missedEvents;
@@ -248,12 +248,12 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   } else {
     for (unsigned int i = 0; i < inputTree->GetEntriesFast(); ++i) {
       clustersInModule["cern"] = clCreators["cern"].FindClustersInEventBoole(
-          (data["cern"].at(i)), 1.5, 2.5, 4.0, 100, false);
+          (data["cern"].at(i)), 1.5, 2.5, 4.0, 100);
       clustersInModule["slayer"] =
-          clCreators["slayer"].FindClustersInEventBoole(
-              (data["slayer"].at(i)), 1.5, 2.5, 4.0, 100, false);
+          clCreators["slayer"].FindClustersInEventBoole((data["slayer"].at(i)),
+                                                        1.5, 2.5, 4.0, 100);
       clustersInModule["HD2"] = clCreators["HD2"].FindClustersInEventBoole(
-          (data["HD2"].at(i)), 1.5, 2.5, 4.0, 100, false);
+          (data["HD2"].at(i)), 1.5, 2.5, 4.0, 100);
 
       if (clustersInModule["cern"].size() == 1 &&
           clustersInModule["slayer"].size() == 1 &&
@@ -265,7 +265,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
         // why am I calling this again? Doesnt matter it's fast
         clustersInModule["slayer"] =
             clCreators["simulation"].FindClustersInEventBoole(
-                (data["slayer"].at(i)), 1.5, 2.5, 4.0, 100, false);
+                (data["slayer"].at(i)), 1.5, 2.5, 4.0, 100);
 
         // get the x positions of the clusters to do some primitive tracking
         xPositions = {
