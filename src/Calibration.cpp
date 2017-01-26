@@ -40,59 +40,23 @@ TString removePath(TString str) {
   return str;
 }
 
-std::vector<Event> parseRootTree(
-    TTree *dataTree, unsigned int uplinkMin, unsigned int uplinkMax,
-    unsigned int nAdcs,
-    const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
-    const std::map<unsigned int, std::map<unsigned int, double>> &gains) {
+std::vector<Event> parseRootTree(TTree *dataTree, unsigned int uplinkMin,
+                                 unsigned int uplinkMax, unsigned int nAdcs,
+                                 double factor,
+                                 const map_uint_map_uint_double &pedestals,
+                                 const map_uint_map_uint_double &gains) {
   std::vector<Event> dataVector(dataTree->GetEntries());
-
-  const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
-
-  std::vector<std::vector<float>> adcVals(nUplinks, std::vector<float>(nAdcs));
-
-  dataTree->SetBranchStatus("*", 0);
-  for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
-    std::string branchName = "Uplink_" + std::to_string(uplink) + "_adc_";
-    for (unsigned int adc = 0; adc < nAdcs; ++adc) {
-      dataTree->SetBranchStatus((branchName + std::to_string(adc + 1)).c_str(),
-                                1);
-      dataTree->SetBranchAddress((branchName + std::to_string(adc + 1)).c_str(),
-                                 &adcVals[uplink - uplinkMin][adc]);
-    }
-  }
-  for (unsigned int i = 0; i < dataTree->GetEntriesFast(); ++i) {
-    dataTree->GetEntry(i);
-    Event event(nAdcs * (uplinkMax - uplinkMin + 1));
-    for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
-      for (unsigned int adc = 0; adc < nAdcs; ++adc) {
-        Channel c;
-        c.Uplink = uplink;
-        c.ChannelNumber = adc + 1;
-        c.AdcValue = (adcVals[uplink - uplinkMin][adc] -
-                      pedestals.at(uplink).at(adc + 1)) /
-                     gains.at(uplink).at(adc + 1);
-        event[(adc + (uplink - uplinkMin) * nAdcs)] = std::move(c);
-      }
-    }
-    dataVector[i] = std::move(event);
-  }
-
-  dataTree->ResetBranchAddresses();
-
-  return dataVector;
-}
-
-std::vector<Event> parseCorrectedRootTree(TTree *dataTree,
-                                          unsigned int uplinkMin,
-                                          unsigned int uplinkMax,
-                                          unsigned int nAdcs, double factor) {
-  std::vector<Event> dataVector(dataTree->GetEntriesFast());
 
   if (factor != 1.)
     std::cout << "Parsing corrected root tree and correct the adc value for "
                  "the factor of "
               << factor << "!\n";
+
+  bool perform_correction{false};
+  if (!pedestals.empty() && !gains.empty()) {
+    std::cout << "Correcting for gain and pedestal\n";
+    perform_correction = true;
+  }
 
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
   std::vector<std::vector<float>> adcVals(nUplinks, std::vector<float>(nAdcs));
@@ -114,9 +78,6 @@ std::vector<Event> parseCorrectedRootTree(TTree *dataTree,
     Event event(nAdcs * (uplinkMax - uplinkMin + 1));
     for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
       for (unsigned int adc = 0; adc < nAdcs; ++adc) {
-        //          std::cout << "stroring adcVals[" << uplink-uplinkMin << "]["
-        //          << adc << "] at " <<  (adc + (uplink - uplinkMin)*nAdcs) <<
-        //          "\n";
         Channel c;
         c.Uplink = uplink;
         c.ChannelNumber = adc + 1;
@@ -124,11 +85,10 @@ std::vector<Event> parseCorrectedRootTree(TTree *dataTree,
           c.AdcValue = adcVals[uplink - uplinkMin][adc] * factor;
         } else
           c.AdcValue = 0;
-        // if(adcVals[uplink-uplinkMin][adc]>10 ||
-        // adcVals[uplink-uplinkMin][adc] <-10){
-        //}
-        //          std::cout << uplink << "\t" << adc << "\t" <<
-        //          adcVals[uplink-uplinkMin][adc] << "\n";
+        if (perform_correction) {
+          c.AdcValue = (c.AdcValue - pedestals.at(uplink).at(adc + 1)) /
+                       gains.at(uplink).at(adc + 1);
+        }
         event[adc + (uplink - uplinkMin) * nAdcs] = std::move(c);
       }
     }
@@ -281,49 +241,23 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
             << std::endl;
 }
 
-std::map<unsigned int, std::map<unsigned int, double>> readGains(
-    std::string fileName) {
+map_uint_map_uint_double readGains(std::string fileName) {
   std::ifstream inputFile(fileName);
   std::string line;
   int uplinkNumber{0};
   int adcNumber{0};
   double gain{0};
 
-  //  std::map<unsigned int, double> means;
-  //  std::map<unsigned int, double> goodGains;
-
-  std::map<unsigned int, std::map<unsigned int, double>> gains;
+  map_uint_map_uint_double gains;
   while (std::getline(inputFile, line)) {
     std::istringstream ss(line);
     if (ss >> uplinkNumber >> adcNumber >> gain) {
       std::cout << uplinkNumber << "\t" << adcNumber << "\t" << gain
                 << std::endl;
 
-      //        if(means.find( uplinkNumber ) == means.end()){
-      //          means[uplinkNumber] = 0.;
-      //          goodGains[uplinkNumber] = 0.;
-      //        }
-
       gains[uplinkNumber][adcNumber] = gain;
-
-      //        if(!gain == 0){
-      //          means[uplinkNumber] += gain;
-      //          ++goodGains[uplinkNumber];
-      //        }
     }
   }
-  // replace gains from failed fits by the mean of all gains of the same uplink
-  // maybe not a good idea!
-  //  for(auto& uplink : gains){
-  //    means[uplink.first] /= goodGains[uplink.first];
-  //    for(auto& adc : uplink.second){
-  //      if (adc.second == 0){
-  //        std::cout << "replacing " << adc.second << " by " <<
-  //        means[uplink.first] << std::endl;
-  //        adc.second = means[uplink.first];
-  //      }
-  //    }
-  //  }
   return gains;
 }
 
@@ -359,9 +293,10 @@ unsigned int runNumberFromFilename(std::string filename) {
   return std::stoi(match[0]);
 }
 
-std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
-    const std::string fileName, const unsigned int uplinkMin,
-    const unsigned int uplinkMax, const unsigned int nAdcs) {
+map_uint_map_uint_double getPedestals(const std::string fileName,
+                                      const unsigned int uplinkMin,
+                                      const unsigned int uplinkMax,
+                                      const unsigned int nAdcs) {
   TFile pedestalFile(fileName.c_str(), "READ");
   if (!pedestalFile.IsOpen()) {
     std::cerr << "unable to open pedestal file " << fileName << std::endl;
@@ -391,7 +326,7 @@ std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
     }
   }
   std::cout << "loop over file" << std::endl;
-  std::map<unsigned int, std::map<unsigned int, double>> pedestals;
+  map_uint_map_uint_double pedestals;
   for (unsigned int i = 0; i < pedestalTree->GetEntriesFast(); ++i) {
     pedestalTree->GetEntry(i);
     for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -412,18 +347,16 @@ std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
   return pedestals;
 }
 
-void correctFile(
-    TTree *tree2correct,
-    const std::map<unsigned int, std::map<unsigned int, double>> &gains,
-    const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
-    const unsigned int uplinkMin, const unsigned int uplinkMax,
-    const unsigned int nAdcs, TString newFileName) {
+void correctFile(TTree *tree2correct, const map_uint_map_uint_double &gains,
+                 const map_uint_map_uint_double &pedestals,
+                 const unsigned int uplinkMin, const unsigned int uplinkMax,
+                 const unsigned int nAdcs, TString newFileName) {
   //  newFileName = removePath(newFileName);
   //  TFile correctedFile(("/data/testbeam/data/corrected/" +
   //  newFileName).Data(), "RECREATE");
 
   TFile correctedFile(newFileName.Data(), "RECREATE");
-  auto correctedTree = std::make_unique<TTree>("rawData", "rawData");
+  auto correctedTree = new TTree("rawData", "rawData");
 
   // setup fill mechanism for new TTree
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;

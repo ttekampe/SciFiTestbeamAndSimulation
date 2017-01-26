@@ -210,11 +210,11 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   std::vector<double> zPositions = {0., 247.0 * 1000, 469.0 * 1000};
 
   if (c.simulation) {
-    data["simulation"] = parseCorrectedRootTree(inputTree, 1, 4, 128);
+    data["simulation"] = parseRootTree(inputTree, 1, 4, 128);
   } else {
-    data["cern"] = parseCorrectedRootTree(inputTree, 1, 2, 128);
-    data["slayer"] = parseCorrectedRootTree(inputTree, 3, 4, 128);
-    data["HD2"] = parseCorrectedRootTree(inputTree, 5, 6, 128);
+    data["cern"] = parseRootTree(inputTree, 1, 2, 128);
+    data["slayer"] = parseRootTree(inputTree, 3, 4, 128);
+    data["HD2"] = parseRootTree(inputTree, 5, 6, 128);
   }
 
   std::map<std::string, ClusterCreator> clCreators;
