@@ -361,36 +361,32 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
     offsetFile.close();
 
     // restart the procedure, this time the offsetfile will exist
-    std::map<std::string, std::vector<std::vector<Channel> *> *> data;
-    for (auto &module : data) {
-      for (unsigned int entryIndex = 0; entryIndex < module.second->size();
-           ++entryIndex) {
-        delete module.second->at(entryIndex);
-      }
-    }
 
     delete inputTree;
     inputFile.Close();
     return analyse(file2analyse, c, true);
   }
 
-  double meanLightYield{0};
-  for (const auto &cl : clCreators["simulation"].getClusters()) {
-    meanLightYield += cl.GetSumOfAdcValues();
-  }
-  meanLightYield /= (double)clCreators["simulation"].getNumberOfClusters();
+  double sumLightYield = std::accumulate(
+      clCreators["simulation"].getClusters().begin(),
+      clCreators["simulation"].getClusters().end(), 0.,
+      [](double ly, const Cluster &cl) { return ly + cl.GetSumOfAdcValues(); });
 
-  double stdDevLightYield{0};
-  for (const auto &cl : clCreators["simulation"].getClusters()) {
-    stdDevLightYield += (cl.GetSumOfAdcValues() - meanLightYield) *
-                        (cl.GetSumOfAdcValues() - meanLightYield);
-  }
+  double sumLightYieldSq = std::accumulate(
+      clCreators["simulation"].getClusters().begin(),
+      clCreators["simulation"].getClusters().end(), 0.,
+      [&](double ly, const Cluster &cl) {
+        return (ly + cl.GetSumOfAdcValues() * cl.GetSumOfAdcValues());
+      });
 
-  stdDevLightYield *=
-      1. / ((double)clCreators["simulation"].getNumberOfClusters() - 1.);
-  stdDevLightYield =
-      TMath::Sqrt(stdDevLightYield) /
-      TMath::Sqrt((double)clCreators["simulation"].getNumberOfClusters());
+  double meanLightYield =
+      sumLightYield / (double)clCreators["simulation"].getNumberOfClusters();
+  double stdDevLightYield = std::sqrt(
+      sumLightYieldSq / (double)clCreators["simulation"].getNumberOfClusters() -
+      meanLightYield * meanLightYield);
+
+  stdDevLightYield /=
+      std::sqrt((double)clCreators["simulation"].getNumberOfClusters());
 
   std::cout << "Mean light yield: " << meanLightYield << " +/- "
             << stdDevLightYield << "\n";
