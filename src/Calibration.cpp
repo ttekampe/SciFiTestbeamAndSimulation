@@ -1,9 +1,8 @@
 // from std
 #include <algorithm>
-#include <exception>
 #include <fstream>
 #include <iostream>
-#include <numeric>
+#include <memory>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -28,13 +27,9 @@
 #include "TString.h"
 #include "TTree.h"
 
-// from BOOST
-#include "boost/filesystem.hpp"
-
 // from here
 #include "Calibration.h"
 #include "Cluster.h"
-#include "ConfigParser.h"
 #include "lhcbStyle.h"
 
 TString removePath(TString str) {
@@ -45,77 +40,26 @@ TString removePath(TString str) {
   return str;
 }
 
-std::vector<Event *> *parseRootTree(
-    TTree *dataTree, unsigned int uplinkMin, unsigned int uplinkMax,
-    unsigned int nAdcs,
-    const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
-    const std::map<unsigned int, std::map<unsigned int, double>> &gains) {
-  std::vector<Event *> *dataVector =
-      new std::vector<Event *>(dataTree->GetEntriesFast());
-
-  const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
-  float **adcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nAdcs; ++i) {
-    adcVals[i] = new float[nAdcs];
-  }
-
-  dataTree->SetBranchStatus("*", 0);
-  for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
-    std::string branchName = "Uplink_" + std::to_string(uplink) + "_adc_";
-    for (unsigned int adc = 0; adc < nAdcs; ++adc) {
-      dataTree->SetBranchStatus((branchName + std::to_string(adc + 1)).c_str(),
-                                1);
-      dataTree->SetBranchAddress((branchName + std::to_string(adc + 1)).c_str(),
-                                 &adcVals[uplink - uplinkMin][adc]);
-    }
-  }
-  for (unsigned int i = 0; i < dataTree->GetEntriesFast(); ++i) {
-    dataTree->GetEntry(i);
-    Event *event = new Event(nAdcs * (uplinkMax - uplinkMin + 1));
-    for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
-      for (unsigned int adc = 0; adc < nAdcs; ++adc) {
-        Channel c;
-        c.Uplink = uplink;
-        c.ChannelNumber = adc + 1;
-        c.AdcValue = (adcVals[uplink - uplinkMin][adc] -
-                      pedestals.at(uplink).at(adc + 1)) /
-                     gains.at(uplink).at(adc + 1);
-        event->at(adc + (uplink - uplinkMin) * nAdcs) = c;
-      }
-    }
-    dataVector->at(i) = event;
-  }
-
-  dataTree->ResetBranchAddresses();
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] adcVals[i];
-  }
-  delete[] adcVals;
-
-  return dataVector;
-}
-
-std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
-                                             unsigned int uplinkMin,
-                                             unsigned int uplinkMax,
-                                             unsigned int nAdcs,
-                                             double factor) {
-  std::vector<Event *> *dataVector =
-      new std::vector<Event *>(dataTree->GetEntriesFast());
+std::vector<Event> parseRootTree(TTree *dataTree, unsigned int uplinkMin,
+                                 unsigned int uplinkMax, unsigned int nAdcs,
+                                 double factor,
+                                 const map_uint_map_uint_double &pedestals,
+                                 const map_uint_map_uint_double &gains) {
+  std::vector<Event> dataVector(dataTree->GetEntries());
 
   if (factor != 1.)
     std::cout << "Parsing corrected root tree and correct the adc value for "
                  "the factor of "
               << factor << "!\n";
 
-  const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
-  float **adcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    adcVals[i] = new float[nAdcs];
+  bool perform_correction{false};
+  if (!pedestals.empty() && !gains.empty()) {
+    std::cout << "Correcting for gain and pedestal\n";
+    perform_correction = true;
   }
 
-  //  std::vector<std::vector<float> > adcVals(nUplinks,
-  //  std::vector<float>(nAdcs));
+  const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
+  std::vector<std::vector<float>> adcVals(nUplinks, std::vector<float>(nAdcs));
 
   dataTree->SetBranchStatus("*", 0);
   for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -131,12 +75,9 @@ std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
             << "\n";
   for (unsigned int i = 0; i < dataTree->GetEntriesFast(); ++i) {
     dataTree->GetEntry(i);
-    Event *event = new Event(nAdcs * (uplinkMax - uplinkMin + 1));
+    Event event(nAdcs * (uplinkMax - uplinkMin + 1));
     for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
       for (unsigned int adc = 0; adc < nAdcs; ++adc) {
-        //          std::cout << "stroring adcVals[" << uplink-uplinkMin << "]["
-        //          << adc << "] at " <<  (adc + (uplink - uplinkMin)*nAdcs) <<
-        //          "\n";
         Channel c;
         c.Uplink = uplink;
         c.ChannelNumber = adc + 1;
@@ -144,22 +85,17 @@ std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
           c.AdcValue = adcVals[uplink - uplinkMin][adc] * factor;
         } else
           c.AdcValue = 0;
-        // if(adcVals[uplink-uplinkMin][adc]>10 ||
-        // adcVals[uplink-uplinkMin][adc] <-10){
-        //}
-        //          std::cout << uplink << "\t" << adc << "\t" <<
-        //          adcVals[uplink-uplinkMin][adc] << "\n";
-        event->at(adc + (uplink - uplinkMin) * nAdcs) = c;
+        if (perform_correction) {
+          c.AdcValue = (c.AdcValue - pedestals.at(uplink).at(adc + 1)) /
+                       gains.at(uplink).at(adc + 1);
+        }
+        event[adc + (uplink - uplinkMin) * nAdcs] = std::move(c);
       }
     }
-    dataVector->at(i) = event;
+    dataVector[i] = std::move(event);
   }
 
   //  dataTree->ResetBranchAddresses();
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] adcVals[i];
-  }
-  delete[] adcVals;
 
   return dataVector;
 }
@@ -208,12 +144,6 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       auto max_peak = *std::max_element(peaks, peaks + nGaussians);
       auto min_peak = *std::min_element(peaks, peaks + nGaussians);
 
-      //      std::cout << "Found peaks at ";
-      //      for(unsigned int k = 0; k<nGaussians; ++k){
-      //        std::cout << peaks [k] << "\t";
-      //      }
-      //      std::cout << std::endl;
-
       RooRealVar adcCount(branchName, branchName, min_peak - 30.,
                           max_peak + 30.);
       RooRealVar mean("mean", "", min_peak, 420., 650.);
@@ -223,32 +153,33 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
                       45., 75.);
       RooDataSet dataSet("dataSet", "", t, RooArgSet(adcCount));
 
-      std::vector<RooGaussian *> gaussians(nGaussians, nullptr);
-      std::vector<RooFormulaVar *> means(nGaussians, nullptr);
-      std::vector<RooFormulaVar *> sigmas(nGaussians, nullptr);
-      std::vector<RooRealVar *> fractions(nGaussians - 1, nullptr);
+      std::vector<std::shared_ptr<RooGaussian>> gaussians(nGaussians, nullptr);
+      std::vector<std::shared_ptr<RooFormulaVar>> means(nGaussians, nullptr);
+      std::vector<std::shared_ptr<RooFormulaVar>> sigmas(nGaussians, nullptr);
+      std::vector<std::shared_ptr<RooRealVar>> fractions(nGaussians - 1,
+                                                         nullptr);
 
       RooArgList gaussianList("gaussianList");
       RooArgList fractionList("fractionList");
       for (unsigned int j = 0; j < nGaussians; ++j) {
-        means[j] =
-            new RooFormulaVar(TString("mean_" + std::to_string(j)).Data(), "",
-                              TString("mean+gain*" + std::to_string(j)).Data(),
-                              RooArgList(mean, gain));
-        sigmas[j] =
-            new RooFormulaVar(TString("sigma_" + std::to_string(j)).Data(), "",
-                              TString("sqrt(sigma1*sigma1+" +
-                                      std::to_string(j) + "*sigma2*sigma2)")
-                                  .Data(),
-                              RooArgList(sigma1, sigma2));
-        gaussians[j] =
-            new RooGaussian(TString("gaussian_" + std::to_string(j)).Data(), "",
-                            adcCount, *means[j], *sigmas[j]);
+        means[j] = std::make_shared<RooFormulaVar>(
+            TString("mean_" + std::to_string(j)).Data(), "",
+            TString("mean+gain*" + std::to_string(j)).Data(),
+            RooArgList(mean, gain));
+        sigmas[j] = std::make_shared<RooFormulaVar>(
+            TString("sigma_" + std::to_string(j)).Data(), "",
+            TString("sqrt(sigma1*sigma1+" + std::to_string(j) +
+                    "*sigma2*sigma2)")
+                .Data(),
+            RooArgList(sigma1, sigma2));
+        gaussians[j] = std::make_shared<RooGaussian>(
+            TString("gaussian_" + std::to_string(j)).Data(), "", adcCount,
+            *means[j], *sigmas[j]);
         gaussianList.add(*gaussians[j]);
         if (j > 0) {
-          fractions[j - 1] =
-              new RooRealVar(TString("fraction_" + std::to_string(j)).Data(),
-                             "", 1. / 2. / j, 0., 1.);
+          fractions[j - 1] = std::make_shared<RooRealVar>(
+              TString("fraction_" + std::to_string(j)).Data(), "", 1. / 2. / j,
+              0., 1.);
           fractionList.add(*fractions[j - 1]);
         }
       }
@@ -302,14 +233,6 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
       pdf.plotOn(myFrame);
       myFrame->Draw();
       can.SaveAs((savePath + canvasName).Data());
-
-      for (unsigned int i = 0; i < nGaussians; ++i) {
-        delete means[i];
-        delete gaussians[i];
-        if (i > 0) {
-          delete fractions[i - 1];
-        }
-      }
     }
   }
   can.SaveAs((savePath + canvasName + "]").Data());
@@ -318,49 +241,23 @@ void produceGains(TTree *t, const unsigned int uplinkMin,
             << std::endl;
 }
 
-std::map<unsigned int, std::map<unsigned int, double>> readGains(
-    std::string fileName) {
+map_uint_map_uint_double readGains(std::string fileName) {
   std::ifstream inputFile(fileName);
   std::string line;
   int uplinkNumber{0};
   int adcNumber{0};
   double gain{0};
 
-  //  std::map<unsigned int, double> means;
-  //  std::map<unsigned int, double> goodGains;
-
-  std::map<unsigned int, std::map<unsigned int, double>> gains;
+  map_uint_map_uint_double gains;
   while (std::getline(inputFile, line)) {
     std::istringstream ss(line);
     if (ss >> uplinkNumber >> adcNumber >> gain) {
       std::cout << uplinkNumber << "\t" << adcNumber << "\t" << gain
                 << std::endl;
 
-      //        if(means.find( uplinkNumber ) == means.end()){
-      //          means[uplinkNumber] = 0.;
-      //          goodGains[uplinkNumber] = 0.;
-      //        }
-
       gains[uplinkNumber][adcNumber] = gain;
-
-      //        if(!gain == 0){
-      //          means[uplinkNumber] += gain;
-      //          ++goodGains[uplinkNumber];
-      //        }
     }
   }
-  // replace gains from failed fits by the mean of all gains of the same uplink
-  // maybe not a good idea!
-  //  for(auto& uplink : gains){
-  //    means[uplink.first] /= goodGains[uplink.first];
-  //    for(auto& adc : uplink.second){
-  //      if (adc.second == 0){
-  //        std::cout << "replacing " << adc.second << " by " <<
-  //        means[uplink.first] << std::endl;
-  //        adc.second = means[uplink.first];
-  //      }
-  //    }
-  //  }
   return gains;
 }
 
@@ -388,9 +285,6 @@ calibrationRunNumbers lookUpCalibrationFiles(
 }
 
 unsigned int runNumberFromFilename(std::string filename) {
-  // if(size_t posOfSlash = filename.rfind("/") != std::string::npos){
-  //   filename = filename.substr(posOfSlash+1);
-  // }
   filename = removePath(filename);
   // In May15 testbeam, unixtime was used as runNumber and contained 10 digits
   std::regex re("\\d{10,}");
@@ -399,9 +293,10 @@ unsigned int runNumberFromFilename(std::string filename) {
   return std::stoi(match[0]);
 }
 
-std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
-    const std::string fileName, const unsigned int uplinkMin,
-    const unsigned int uplinkMax, const unsigned int nAdcs) {
+map_uint_map_uint_double getPedestals(const std::string fileName,
+                                      const unsigned int uplinkMin,
+                                      const unsigned int uplinkMax,
+                                      const unsigned int nAdcs) {
   TFile pedestalFile(fileName.c_str(), "READ");
   if (!pedestalFile.IsOpen()) {
     std::cerr << "unable to open pedestal file " << fileName << std::endl;
@@ -413,10 +308,10 @@ std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
   std::cout << "creating double array of form double[" << nUplinks << "]["
             << nAdcs << "]\n";
-  float **rawAdcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    rawAdcVals[i] = new float[nAdcs];
-  }
+
+  std::vector<std::vector<float>> rawAdcVals(nUplinks,
+                                             std::vector<float>(nAdcs));
+
   std::cout << "setting branch addresses" << std::endl;
   std::string branchNameTemplate1 = "Uplink_";
   for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -431,7 +326,7 @@ std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
     }
   }
   std::cout << "loop over file" << std::endl;
-  std::map<unsigned int, std::map<unsigned int, double>> pedestals;
+  map_uint_map_uint_double pedestals;
   for (unsigned int i = 0; i < pedestalTree->GetEntriesFast(); ++i) {
     pedestalTree->GetEntry(i);
     for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -448,37 +343,27 @@ std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
   }
   pedestalTree->ResetBranchAddresses();
   pedestalFile.Close();
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] rawAdcVals[i];
-  }
-  delete[] rawAdcVals;
 
   return pedestals;
 }
 
-void correctFile(
-    TTree *tree2correct,
-    const std::map<unsigned int, std::map<unsigned int, double>> &gains,
-    const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
-    const unsigned int uplinkMin, const unsigned int uplinkMax,
-    const unsigned int nAdcs, TString newFileName) {
+void correctFile(TTree *tree2correct, const map_uint_map_uint_double &gains,
+                 const map_uint_map_uint_double &pedestals,
+                 const unsigned int uplinkMin, const unsigned int uplinkMax,
+                 const unsigned int nAdcs, TString newFileName) {
   //  newFileName = removePath(newFileName);
   //  TFile correctedFile(("/data/testbeam/data/corrected/" +
   //  newFileName).Data(), "RECREATE");
 
   TFile correctedFile(newFileName.Data(), "RECREATE");
-  TTree *correctedTree = new TTree("rawData", "rawData");
+  auto correctedTree = new TTree("rawData", "rawData");
 
   // setup fill mechanism for new TTree
   const unsigned int nUplinks = uplinkMax - uplinkMin + 1;
-  float **correctedAdcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    correctedAdcVals[i] = new float[nAdcs];
-  }
-  float **rawAdcVals = new float *[nUplinks];
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    rawAdcVals[i] = new float[nAdcs];
-  }
+  std::vector<std::vector<float>> rawAdcVals(nUplinks,
+                                             std::vector<float>(nAdcs));
+  std::vector<std::vector<float>> correctedAdcVals(nUplinks,
+                                                   std::vector<float>(nAdcs));
 
   std::string branchNameTemplate1 = "Uplink_";
   for (unsigned int uplink = uplinkMin; uplink <= uplinkMax; ++uplink) {
@@ -515,239 +400,4 @@ void correctFile(
   correctedTree->ResetBranchAddresses();
   correctedTree->Write();
   correctedFile.Close();
-
-  for (unsigned int i = 0; i < nUplinks; ++i) {
-    delete[] correctedAdcVals[i];
-    delete[] rawAdcVals[i];
-  }
-  delete[] correctedAdcVals;
-  delete[] rawAdcVals;
 }
-
-bool get_x_offsets(std::string fileName,
-                   std::map<std::string, double> &xOffsets) {
-  std::ifstream offsetFile(fileName);
-  if (!offsetFile) {
-    return false;
-  } else {
-    std::string line;
-    double offset;
-    std::string name;
-    while (std::getline(offsetFile, line)) {
-      std::istringstream ss(line);
-      if (ss >> name >> offset) {
-        xOffsets[name] = offset;
-      } else {
-        std::cerr
-            << "Cannot interpret following line in x_offset file:\n"
-            << line << "\n"
-            << "Lines should contain the fibremat name, a white space and "
-               "then the value";
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-std::string replace(std::string str, const std::string &from,
-                    const std::string &to) {
-  size_t start_pos = str.find(from);
-  if (start_pos != std::string::npos) {
-    str.replace(start_pos, from.length(), to);
-  }
-  return str;
-}
-
-// std::map<std::string, double> align_x_coordinates(
-//     std::map<std::string, double> zPositions,
-//     std::map<std::string, std::vector<Cluster *>> clusters,
-//     std::vector<FibMatInfo> fibreMats, std::string offsetFileName) {
-//   std::map<std::string, std::vector<double>> trackDistances;
-//   std::string this_mat;
-//   std::vector<std::string> other_mats;
-//   std::vector<Point> points;
-//   Line current_track;
-//   if (zPositions.size() < 3) {
-//     std::cerr
-//         << "Error in calc_x_offset: not enaugh fibre mats to find a track\n"
-//         << "Found " << zPositions.size() << ", need at least 3\n";
-//     throw std::runtime_error("Not enaugh fibre mats to do tracking");
-//   }
-//   // fit a line using clusters in all fibre mats
-//   // except the one currectly looking at
-//   for (const auto &mat : fibreMats) {
-//     this_mat = mat.name;
-//     other_mats.clear();
-//     for (const auto &mat2 : fibreMats) {
-//       if (mat2.name == this_mat) {
-//         continue;
-//       }
-//       other_mats.push_back(mat2.name);
-//     }
-//     for (unsigned int i = 0; i < clusters[mat.name].size(); ++i) {
-//       points.clear();
-//       for (const auto &other_mat : other_mats) {
-//         points.push_back(
-//             {zPositions[other_mat],
-//              clusters[other_mat][i]->GetChargeWeightedMean() * 250.});
-//       }
-//       current_track.fitPoints(points);
-//       trackDistances[mat.name].push_back(
-//           current_track.getYforX(zPositions[mat.name]) -
-//           (clusters[mat.name][i]->GetChargeWeightedMean() * 250.));
-//     }
-//   }
-//   // fit gaussian to offsets and store the found offset in a file
-//   boost::filesystem::path p(offsetFileName);
-//   boost::filesystem::create_directories(p.parent_path());
-//   std::ofstream offsetFile(offsetFileName);
-//   std::map<std::string, double> offsets;
-//   for (const auto &mat : fibreMats) {
-//     TCanvas can_offset;
-//     std::cout << "Collected " << trackDistances[mat.name].size()
-//               << " xoffsets\n";
-//
-//     double sum = std::accumulate(trackDistances[mat.name].begin(),
-//                                  trackDistances[mat.name].end(), 0.0);
-//     double mean = sum / trackDistances[mat.name].size();
-//
-//     double sq_sum = std::inner_product(trackDistances[mat.name].begin(),
-//                                        trackDistances[mat.name].end(),
-//                                        trackDistances[mat.name].begin(),
-//                                        0.0);
-//     double stdev =
-//         std::sqrt(sq_sum / trackDistances[mat.name].size() - mean * mean);
-//
-//     std::cout << "mean: " << mean << " stdev: " << stdev << "\n";
-//
-//     RooRealVar rv_xoffset("rv_xoffset", "", mean - 300, mean + 300);
-//
-//     RooDataSet dataset_xoffset("dataset_xoffset", "", RooArgSet(rv_xoffset));
-//     for (const auto xoffset : trackDistances[mat.name]) {
-//       // veto absurd offset values (noise / wrongly associated clusters)
-//       if (xoffset > mean + 300 || xoffset < mean - 300) continue;
-//       rv_xoffset.setVal(xoffset);
-//       dataset_xoffset.add(RooArgSet(rv_xoffset));
-//     }
-//     dataset_xoffset.Print();
-//     RooRealVar rv_mean("rv_mean", "", mean, mean - 100, mean + 100);
-//     RooRealVar rv_sigma("rv_sigma", "", 50, 0, 100);
-//     RooGaussian gauss("gauss", "", rv_xoffset, rv_mean, rv_sigma);
-//
-//     RooFitResult *fr = gauss.fitTo(dataset_xoffset, RooFit::Save(true),
-//                                    RooFit::Minimizer("Minuit2", "minimize"));
-//
-//     RooPlot *plot = rv_xoffset.frame();
-//     dataset_xoffset.plotOn(plot);
-//     gauss.plotOn(plot);
-//     plot->Draw();
-//
-//     can_offset.SaveAs(replace(offsetFileName, ".txt", ".pdf").c_str());
-//
-//     fr->Print("v");
-//
-//     offsetFile << mat.name << "\t" << rv_mean.getVal() << "\n";
-//     offsets[mat.name] = rv_mean.getVal();
-//   }
-//
-//   offsetFile.close();
-//   return offsets;
-// }
-
-// this is with track reco
-// std::map<std::string, double> calc_x_offset(
-//     std::map<std::string, double> zPositions,
-//     std::map<std::string, std::vector<Cluster *>> clusters,
-//     std::vector<FibMatInfo> fibreMats, std::string offsetFileName) {
-//   std::map<std::string, std::vector<double>> trackDistances;
-//   std::string this_mat;
-//   std::vector<std::string> other_mats;
-//   std::vector<Point> points;
-//   Line current_track;
-//   if (zPositions.size() < 3) {
-//     std::cerr
-//         << "Error in calc_x_offset: not enaugh fibre mats to find a track\n"
-//         << "Found " << zPositions.size() << ", need at least 3\n";
-//     throw std::runtime_error("Not enaugh fibre mats to do tracking");
-//   }
-//   // fit a line using clusters in all fibre mats
-//   // except the one currectly looking at
-//   for (const auto &mat : fibreMats) {
-//     this_mat = mat.name;
-//     other_mats.clear();
-//     for (const auto &mat2 : fibreMats) {
-//       if (mat2.name == this_mat) {
-//         continue;
-//       }
-//       other_mats.push_back(mat2.name);
-//     }
-//     for (unsigned int i = 0; i < clusters[mat.name].size(); ++i) {
-//       points.clear();
-//       for (const auto &other_mat : other_mats) {
-//         points.push_back(
-//             {zPositions[other_mat],
-//              clusters[other_mat][i]->GetChargeWeightedMean() * 250.});
-//       }
-//       current_track.fitPoints(points);
-//       trackDistances[mat.name].push_back(
-//           current_track.getYforX(zPositions[mat.name]) -
-//           (clusters[mat.name][i]->GetChargeWeightedMean() * 250.));
-//     }
-//   }
-//   // fit gaussian to offsets and store the found offset in a file
-//   boost::filesystem::path p(offsetFileName);
-//   boost::filesystem::create_directories(p.parent_path());
-//   std::ofstream offsetFile(offsetFileName);
-//   std::map<std::string, double> offsets;
-//   for (const auto &mat : fibreMats) {
-//     TCanvas can_offset;
-//     std::cout << "Collected " << trackDistances[mat.name].size()
-//               << " xoffsets\n";
-//
-//     double sum = std::accumulate(trackDistances[mat.name].begin(),
-//                                  trackDistances[mat.name].end(), 0.0);
-//     double mean = sum / trackDistances[mat.name].size();
-//
-//     double sq_sum = std::inner_product(trackDistances[mat.name].begin(),
-//                                        trackDistances[mat.name].end(),
-//                                        trackDistances[mat.name].begin(),
-//                                        0.0);
-//     double stdev =
-//         std::sqrt(sq_sum / trackDistances[mat.name].size() - mean * mean);
-//
-//     std::cout << "mean: " << mean << " stdev: " << stdev << "\n";
-//
-//     RooRealVar rv_xoffset("rv_xoffset", "", mean - 300, mean + 300);
-//
-//     RooDataSet dataset_xoffset("dataset_xoffset", "", RooArgSet(rv_xoffset));
-//     for (const auto xoffset : trackDistances[mat.name]) {
-//       // veto absurd offset values (noise / wrongly associated clusters)
-//       if (xoffset > mean + 300 || xoffset < mean - 300) continue;
-//       rv_xoffset.setVal(xoffset);
-//       dataset_xoffset.add(RooArgSet(rv_xoffset));
-//     }
-//     dataset_xoffset.Print();
-//     RooRealVar rv_mean("rv_mean", "", mean, mean - 100, mean + 100);
-//     RooRealVar rv_sigma("rv_sigma", "", 50, 0, 100);
-//     RooGaussian gauss("gauss", "", rv_xoffset, rv_mean, rv_sigma);
-//
-//     RooFitResult *fr = gauss.fitTo(dataset_xoffset, RooFit::Save(true),
-//                                    RooFit::Minimizer("Minuit2", "minimize"));
-//
-//     RooPlot *plot = rv_xoffset.frame();
-//     dataset_xoffset.plotOn(plot);
-//     gauss.plotOn(plot);
-//     plot->Draw();
-//
-//     can_offset.SaveAs(replace(offsetFileName, ".txt", ".pdf").c_str());
-//
-//     fr->Print("v");
-//
-//     offsetFile << mat.name << "\t" << rv_mean.getVal() << "\n";
-//     offsets[mat.name] = rv_mean.getVal();
-//   }
-//
-//   offsetFile.close();
-//   return offsets;
-// }

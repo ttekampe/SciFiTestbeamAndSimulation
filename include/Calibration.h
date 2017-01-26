@@ -11,7 +11,6 @@
 
 // from here
 #include "Cluster.h"
-#include "ConfigParser.h"
 
 typedef std::vector<Channel> Event;
 
@@ -25,53 +24,43 @@ struct calibrationRunNumbers {
   unsigned int led;
 };
 
-std::vector<Event *> *parseRootTree(
-    TTree *dataTree, unsigned int uplinkMin, unsigned int uplinkMax,
-    unsigned int nAdcs,
-    const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
-    const std::map<unsigned int, std::map<unsigned int, double>> &gains);
+typedef std::map<unsigned int, double> map_uint_double;
+typedef std::map<unsigned int, map_uint_double> map_uint_map_uint_double;
 
-std::vector<Event *> *parseCorrectedRootTree(TTree *dataTree,
-                                             unsigned int uplinkMin,
-                                             unsigned int uplinkMax,
-                                             unsigned int nAdcs,
-                                             double factor = 1.);
+std::vector<Event> parseRootTree(
+    TTree* dataTree, unsigned int uplinkMin, unsigned int uplinkMax,
+    unsigned int nAdcs, double factor = 1.,
+    const map_uint_map_uint_double& pedestals = map_uint_map_uint_double(),
+    const map_uint_map_uint_double& gains = map_uint_map_uint_double());
 
-void produceGains(TTree *t, const unsigned int uplinkMin,
+// std::vector<Event> parseCorrectedRootTree(TTree* dataTree,
+//                                           unsigned int uplinkMin,
+//                                           unsigned int uplinkMax,
+//                                           unsigned int nAdcs,
+//                                           double factor = 1.);
+
+void produceGains(TTree* t, const unsigned int uplinkMin,
                   const unsigned int uplinkMax, const unsigned int adcIDmin,
                   const unsigned int adcIDmax, const unsigned int maxGaussians,
                   TString fileName, std::string savePath);
 
-std::map<unsigned int, std::map<unsigned int, double>> readGains(
-    std::string fileName);
+map_uint_map_uint_double readGains(std::string fileName);
 
 calibrationRunNumbers lookUpCalibrationFiles(
     const unsigned int runNumber, const std::string catalogueFileName);
 
 unsigned int runNumberFromFilename(std::string filename);
 
-std::map<unsigned int, std::map<unsigned int, double>> getPedestals(
-    const std::string fileName, const unsigned int uplinkMin,
-    const unsigned int uplinkMax, const unsigned int nAdcs);
+map_uint_map_uint_double getPedestals(const std::string fileName,
+                                      const unsigned int uplinkMin,
+                                      const unsigned int uplinkMax,
+                                      const unsigned int nAdcs);
 
-void correctFile(
-    TTree *tree2correct,
-    const std::map<unsigned int, std::map<unsigned int, double>> &gains,
-    const std::map<unsigned int, std::map<unsigned int, double>> &pedestals,
-    const unsigned int uplinkMin, const unsigned int uplinkMax,
-    const unsigned int nAdcs, TString newFileName);
+void correctFile(TTree* tree2correct, const map_uint_map_uint_double& gains,
+                 const map_uint_map_uint_double& pedestals,
+                 const unsigned int uplinkMin, const unsigned int uplinkMax,
+                 const unsigned int nAdcs, TString newFileName);
 
 TString removePath(TString str);
-
-std::string replace(std::string str, const std::string &from,
-                    const std::string &to);
-
-bool get_x_offsets(std::string fileName,
-                   std::map<std::string, double> &xOffsets);
-
-std::map<std::string, double> calc_x_offset(
-    std::map<std::string, double> zPositions,
-    std::map<std::string, std::vector<Cluster *>> clusters,
-    std::vector<FibMatInfo> fibreMats, std::string offsetFileName);
 
 #endif
