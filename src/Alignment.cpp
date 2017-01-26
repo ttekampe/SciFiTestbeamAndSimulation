@@ -8,7 +8,7 @@
 #include "EDouble.h"
 
 // need global variables for Minuit
-std::map<std::string, std::vector<Cluster*>>* FULL_DATA;
+std::map<std::string, std::vector<Cluster>>* FULL_DATA;
 std::string* DUT;
 std::vector<FibMatInfo>* MATS;
 std::map<std::string, int>* NAME_AND_INDEX;
@@ -35,7 +35,7 @@ void fnc(int& npar, double* deriv, double& func, double param[], int flag) {
         }
         z = mat.z_position;
         track.AddPoint(
-            &z, FULL_DATA->at(mat.name).at(i)->GetChargeWeightedMean() * 250. -
+            &z, FULL_DATA->at(mat.name).at(i).GetChargeWeightedMean() * 250. -
                     param[NAME_AND_INDEX->at(mat.name)]);
       }
       track.Eval();
@@ -50,7 +50,7 @@ void fnc(int& npar, double* deriv, double& func, double param[], int flag) {
         track_at_mat = straight_line(y0, slope, mat.z_position);
         rv += std::pow(
             (track_at_mat.GetVal() -
-             FULL_DATA->at(mat.name).at(i)->GetChargeWeightedMean() * 250. -
+             FULL_DATA->at(mat.name).at(i).GetChargeWeightedMean() * 250. -
              param[NAME_AND_INDEX->at(mat.name)]) /
                 track_at_mat.GetError(),
             2);
@@ -61,7 +61,7 @@ void fnc(int& npar, double* deriv, double& func, double param[], int flag) {
   func = rv;
 }
 
-Aligner::Aligner(std::map<std::string, std::vector<Cluster*>> _data,
+Aligner::Aligner(std::map<std::string, std::vector<Cluster>> _data,
                  std::vector<FibMatInfo> _mats) {
   data = _data;
   mats = _mats;

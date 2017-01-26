@@ -15,7 +15,7 @@
 
 class Aligner {
  public:
-  Aligner(std::map<std::string, std::vector<Cluster*>> _data,
+  Aligner(std::map<std::string, std::vector<Cluster>> _data,
           std::vector<FibMatInfo> _mats);
 
   void Align();
@@ -30,7 +30,7 @@ class Aligner {
  private:
   std::map<std::string, std::map<std::string, double>> alignment;
   std::string DUT;
-  std::map<std::string, std::vector<Cluster*>> data;
+  std::map<std::string, std::vector<Cluster>> data;
   std::vector<FibMatInfo> mats;
   // map the name of each fibre mats to an index used in the arrays TMinuit
   // takes as arguments
