@@ -375,7 +375,7 @@ std::pair<EDouble, EDouble> analyse(std::string file2analyse, const config &c,
   double sumLightYieldSq = std::accumulate(
       clCreators["simulation"].getClusters().begin(),
       clCreators["simulation"].getClusters().end(), 0.,
-      [&](double ly, const Cluster &cl) {
+      [](double ly, const Cluster &cl) {
         return (ly + cl.GetSumOfAdcValues() * cl.GetSumOfAdcValues());
       });
 
