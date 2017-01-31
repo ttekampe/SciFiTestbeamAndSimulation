@@ -4,6 +4,10 @@
 #include <ostream>
 #include <string>
 
+/**
+ * Simple uncertainty propagation assuming gaussian
+ * uncertainties
+ */
 class EDouble {
  public:
   EDouble() = default;

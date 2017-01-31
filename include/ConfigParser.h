@@ -16,6 +16,10 @@ struct FibMatInfo {
   double z_position;
 };
 
+/**
+ * \brief Read the configuration needed to perform a cluster analysis from a txt
+ * file
+ */
 class ConfigParser {
  public:
   ConfigParser(std::string file_name);
